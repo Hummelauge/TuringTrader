@@ -893,6 +893,7 @@ namespace TuringTrader
                         newSeries.XAxisKey = "x";
                         newSeries.YAxisKey = "y";
                         newSeries.Color = CFG_COLORS[allSeries.Count % CFG_COLORS.Count()];
+                        //newSeries.StrokeThickness = 5;
                         allSeries[yLabel] = newSeries;
                     }
 
@@ -2006,7 +2007,49 @@ namespace TuringTrader
 
             foreach (var p in periods)
             {
+#if false
+                // retired 2024i08
                 DateTime datePastTarget = dateLast - TimeSpan.FromDays(p.Item2 * 365.25);
+#else
+                // new 2024i08
+                DateTime datePastTarget;
+
+                if (Math.Abs(p.Item2 - 1 / 52.0) < 1e-4)
+                {
+                    // multi-week
+                    var weeksBack = (int)Math.Round(52.0 * p.Item2);
+
+                    datePastTarget = dateLast - TimeSpan.FromDays(7 * weeksBack);
+                }
+                else if (p.Item2 < 1.0)
+                {
+                    // multi-month
+                    var monthsBack = (int)Math.Round(12.0 * p.Item2);
+
+                    var month = (dateLast.Month + 11 - monthsBack) % 12 + 1;
+
+                    var year = month < dateLast.Month
+                        ? dateLast.Year
+                        : dateLast.Year - 1;
+
+                    var day = month == 2
+                        ? Math.Min(dateLast.Day, 28)  // FIXME
+                        : Math.Min(dateLast.Day, 30); // FIXME
+
+                    datePastTarget = new DateTime(year, month, day) + dateLast.TimeOfDay;
+                }
+                else
+                {
+                    // multi-year
+                    var yearsBack = (int)Math.Round(p.Item2);
+
+                    var day = dateLast.Month == 2
+                        ? Math.Min(dateLast.Day, 28)  // FIXME
+                        : Math.Min(dateLast.Day, 30); // FIXME
+
+                    datePastTarget = new DateTime(dateLast.Year - yearsBack, dateLast.Month, day) + dateLast.TimeOfDay;
+                }
+#endif
                 Dictionary<string, object> rowPast = _firstChart
                     .OrderBy(r => Math.Abs((datePastTarget - (DateTime)r[_xLabel]).TotalSeconds))
                     .First();
@@ -2022,10 +2065,19 @@ namespace TuringTrader
             }
             //--- year-to-date
             {
+#if  false
+                // retired 2024i08: calculate against close of first day of the year
                 DateTime datePastTarget = dateLast - TimeSpan.FromDays(dateLast.DayOfYear);
                 Dictionary<string, object> rowPast = _firstChart
                     .OrderBy(r => Math.Abs((datePastTarget - (DateTime)r[_xLabel]).TotalSeconds))
                     .First();
+#else
+                // new 2024i08: calculate against close of last day of previous year
+                Dictionary<string, object> rowPast = _firstChart
+                    .Where(r => ((DateTime)r[_xLabel]).Year < dateLast.Year)
+                    .OrderByDescending(r => ((DateTime)r[_xLabel]).Ticks)
+                    .First();
+#endif
                 DateTime datePast = (DateTime)rowPast[_xLabel];
                 double years = (dateLast - datePast).TotalDays / 365.25;
                 double navPast = (double)rowPast[_firstYLabel];
