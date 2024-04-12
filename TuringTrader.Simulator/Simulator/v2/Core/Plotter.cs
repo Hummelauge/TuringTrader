@@ -86,6 +86,9 @@ namespace TuringTrader.SimulatorV2
             var names = new Dictionary<string, string>();
             var prices = new Dictionary<string, double>();
 
+            // NOTE: the v2 wrapper for v1 child algorithms doesn't advance SimDate.
+            //       As a workaround, we get lastSimDate from the top-level v2 algorithm.
+            var lastSimDate = Algorithm.SimDate;
             var lastRebalanceDate = Algorithm.Account.TradeLog.Last().OrderTicket.SubmitDate;
 
             void addAssetAllocation(Algorithm algo, double scale = 1.0)
@@ -112,7 +115,7 @@ namespace TuringTrader.SimulatorV2
                         {
                             holdings[ticker] = 0.0;
                             names[ticker] = asset.Description;
-                            prices[ticker] = asset.Close[0];
+                            prices[ticker] = asset.Close[lastSimDate];
                         }
 
                         holdings[ticker] += kv.Value * scale;

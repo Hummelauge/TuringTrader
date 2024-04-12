@@ -160,11 +160,6 @@ namespace TuringTrader.SimulatorV2.Tests
                 var algo1 = new SwitchHalfTime_v1 { HoldFirst = true, };
                 var algo2 = new SwitchHalfTime_v1 { HoldFirst = false, };
 
-                // NOTE: we can access the v2 wrapper via the
-                //       asset's meta information
-                var algo1v2 = Asset(algo1).Meta.Generator;
-                var algo2v2 = Asset(algo2).Meta.Generator;
-
                 SimLoop(() =>
                 {
                     if (IsFirstBar)
@@ -174,11 +169,15 @@ namespace TuringTrader.SimulatorV2.Tests
                     }
                 });
 
-                NumChildTrades = algo1v2.Account.TradeLog.Count + algo2v2.Account.TradeLog.Count;
-
                 Plotter.AddTargetAllocation();
                 Plotter.AddTradeLog();
                 Plotter.AddHistoricalAllocations();
+
+                // NOTE: we can access the v2 wrapper via the
+                //       asset's meta information
+                var algo1v2 = Asset(algo1).Meta.Generator;
+                var algo2v2 = Asset(algo2).Meta.Generator;
+                NumChildTrades = algo1v2.Account.TradeLog.Count + algo2v2.Account.TradeLog.Count;
             }
         }
 
@@ -195,7 +194,8 @@ namespace TuringTrader.SimulatorV2.Tests
             var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
             Assert.AreEqual(alloc.Count, 1);
             Assert.AreEqual((string)alloc[0]["Symbol"], "$SPX");
-            Assert.AreEqual(double.Parse(((string)alloc[0]["Allocation"]).TrimEnd('%')), 125.00, 1e-5); // v2 test: 125.35
+            Assert.AreEqual(125.00, double.Parse(((string)alloc[0]["Allocation"]).TrimEnd('%')), 1e-5); // v2 test: 125.35
+            Assert.AreEqual(3839.50, double.Parse(((string)alloc[0]["Price"]).TrimStart('$')), 1e-03); // value from 12/29/2021
 
             var last = algo.Plotter.AllData[Simulator.Plotter.SheetNames.LAST_REBALANCE];
             Assert.IsTrue(last.Count == 1);
