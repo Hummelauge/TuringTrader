@@ -366,7 +366,7 @@ namespace TuringTrader.Simulator
                 { "$SML", "S&P SmallCap 600 Current & Past" },
                 { "$SP1500", "S&P Composite 1500 Current & Past" },
                 { "$SPDAUDP", "S&P 500 Dividend Aristocrats Current & Past" },
-
+                { "$SPXESUP", "S&P 500 ESG Current & Past" },
 
                 { "$RUI", "Russell 1000 Current & Past" },
                 { "$RUT", "Russell 2000 Current & Past" },
