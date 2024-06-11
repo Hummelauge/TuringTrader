@@ -31,8 +31,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using NDU = NorgateData.DataAccess;
-using NDW = NorgateData.WatchListLibrary;
 #endregion
 
 namespace TuringTrader.Simulator
@@ -42,93 +40,32 @@ namespace TuringTrader.Simulator
         #region Norgate DLL loading helpers
         private static class NorgateHelpers
         {
-            private static bool _handleUnresolvedAssemblies = true;
-            private static DateTime _lastNDURun = default(DateTime);
-            private static object _lockNorgate = SimulatorV2.DataSource._lockNorgate;
+            private static bool _IsNorgateDataApiAvailable = false;
+            private static bool _assemblyresolveadded = false;
+            private static object _lockNorgate = SimulatorV2.DataSource._lockNorgate; // new object();
 
-            public static void RunNDU(bool runAlways = false)
+            static public void LoadUnresolvedAssemblies()
             {
-                lock (_lockNorgate)
+                if (!_assemblyresolveadded)
                 {
-                    if (runAlways || DateTime.Now - _lastNDURun > TimeSpan.FromMinutes(5))
-                    {
-                        _lastNDURun = DateTime.Now;
-
-                        string nduBinPath;
-                        getNDUBinPath(out nduBinPath);
-                        string nduTrigger = Path.Combine(nduBinPath, "NDU.Trigger.exe");
-
-                        Process ndu = Process.Start(nduTrigger, "UPDATE CLOSE WAIT");
-                        ndu.WaitForExit();
-                    }
+                    AppDomain currentDomain = AppDomain.CurrentDomain;
+                    currentDomain.AssemblyResolve += LoadNorgateDataAssembly;
+                    _assemblyresolveadded = true;
                 }
             }
-            public static void HandleUnresovledAssemblies()
-            {
-                lock (_lockNorgate)
-                {
-                    if (_handleUnresolvedAssemblies)
-                    {
-                        _handleUnresolvedAssemblies = false;
 
-                        AppDomain currentDomain = AppDomain.CurrentDomain;
-                        currentDomain.AssemblyResolve += currentDomain_AssemblyResolve;
-                    }
-                }
-            }
-            public static Assembly currentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
+            static private Assembly LoadNorgateDataAssembly(object sender, ResolveEventArgs args)
             {
                 string actualassemblyname = new AssemblyName(args.Name).Name;
-
-                if (actualassemblyname == "norgate.data.dotnet" && isAPIAvaliable)
+                if ((actualassemblyname == "NorgateData.DataAccess.API" || actualassemblyname == "NorgateData.Storage" || actualassemblyname == "NorgateData.Storage.IO" || actualassemblyname == "NorgateData.DataAccess.Core") && IsNorgateDataUpdaterInstalled)
                 {
-                    Assembly assembly = Assembly.LoadFrom(actualAPILocation);
-
+                    Assembly assembly = Assembly.LoadFrom(NorgateDataApiFolder + actualassemblyname + ".dll");
                     return assembly;
                 }
-
-                return null;  // this is bad, means the API could not be loaded and will probably throw a program wide exception 
+                return null;  // This will only occur
             }
 
-            public static bool isNDUInstalled
-            {
-                get { return checkForNDUInstallKey(); }
-            }
-            public static string actualAPILocation
-            {
-                get
-                {
-                    string result = "";
-                    if (isNDUInstalled)
-                    {
-                        // get the registry information for NDU BIN path
-                        string nduBinPath = "";
-                        if (getNDUBinPath(out nduBinPath))
-                        {
-                            if (File.Exists(nduBinPath + "norgate.data.dotnet.dll"))
-                            {
-                                result = nduBinPath + "norgate.data.dotnet.dll";
-                            }
-                        }
-                    }
-                    return result;
-                }
-            }
-            public static bool isAPIAvaliable
-            {
-                get
-                {
-                    if (File.Exists(actualAPILocation))
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }
-            }
-            public static bool getNDUBinPath(out string binPath)
+            static private bool GetNorgateDataApiPath(out string binPath)
             {
                 bool result = false;
                 binPath = "";
@@ -137,7 +74,7 @@ namespace TuringTrader.Simulator
                     RegistryKey key = Registry.CurrentUser.OpenSubKey("Software\\NDU\\norgate");
                     if (key != null)
                     {
-                        Object o = key.GetValue("basePath");
+                        Object o = key.GetValue("installPath");
                         if (o != null)
                         {
                             string work = (string)o;
@@ -148,10 +85,6 @@ namespace TuringTrader.Simulator
                                 result = true;
                             }
                         }
-                        else
-                        {
-                            result = false;
-                        }
                     }
                 }
                 catch
@@ -160,7 +93,8 @@ namespace TuringTrader.Simulator
                 }
                 return result;
             }
-            public static bool checkForNDUInstallKey()
+
+            static private bool CheckNorgateDataUpdaterRegistryKey()
             {
                 bool result = false;
                 try
@@ -191,6 +125,76 @@ namespace TuringTrader.Simulator
                 }
                 return result;
             }
+
+            static private bool IsNorgateDataUpdaterInstalled
+            {
+                get { return CheckNorgateDataUpdaterRegistryKey(); }
+            }
+
+            static private string NorgateDataApiFolder
+            {
+                get
+                {
+                    string result = "";
+                    if (IsNorgateDataUpdaterInstalled)
+                    {
+                        // get the registry information for NDU BIN path
+                        if (GetNorgateDataApiPath(out result))
+                            if (Directory.Exists(result))
+                                return result;
+                            else
+                                return "";
+                    }
+                    return "";
+                }
+            }
+
+            static private string NorgateDataApiLocation
+            {
+                get
+                {
+                    string result = "";
+                    if (IsNorgateDataUpdaterInstalled)
+                    {
+                        // get the registry information for NDU BIN path
+                        string nduBinPath = "";
+                        if (GetNorgateDataApiPath(out nduBinPath))
+                            if (File.Exists(nduBinPath + "NorgateData.DataAccess.API.dll"))
+                                result = nduBinPath + "NorgateData.DataAccess.API.dll";
+                    }
+                    return result;
+                }
+            }
+
+            static public bool IsNorgateDataApiAvailable
+            {
+                get
+                {
+                    if (_IsNorgateDataApiAvailable)
+                        return true;
+                    _IsNorgateDataApiAvailable = File.Exists(NorgateDataApiLocation);
+                    return _IsNorgateDataApiAvailable;
+                }
+            }
+
+            private static DateTime _lastNDURun = default(DateTime);
+            static public void RunNDU(bool runAlways = false)
+            {
+                lock (_lockNorgate)
+                {
+                    if (runAlways || DateTime.Now - _lastNDURun > TimeSpan.FromMinutes(5))
+                    {
+                        _lastNDURun = DateTime.Now;
+
+                        string nduBinPath;
+                        GetNorgateDataApiPath(out nduBinPath);
+                        string nduTrigger = Path.Combine(nduBinPath, "NDU.Trigger.exe");
+
+                        Process ndu = Process.Start(nduTrigger, "UPDATE CLOSE WAIT");
+                        ndu.WaitForExit();
+                    }
+                }
+            }
         }
         #endregion
         #region public static void RunNDU()
@@ -215,10 +219,13 @@ namespace TuringTrader.Simulator
                 {
                     // no proper name given, try to retrieve from Norgate
                     string ticker = Info[DataSourceParam.symbolNorgate];
-                    Info[DataSourceParam.name] = NDU.Api.GetSecurityName(ticker);
+                    (var result, Info[DataSourceParam.name]) = NorgateData.DataAccess.Api.GetSecurityName(ticker);
+
+                    if (!result.IsSuccess())
+                        Output.ThrowError("failed to retrieve meta for {0}: {1}", ticker, result.ErrorMessage);
                 }
             }
-            private Bar CreateBar(NDU.RecOHLC norgate, double priceMultiplier)
+            private Bar CreateBar(NorgateData.DataAccess.RecOHLC norgate, double priceMultiplier)
             {
                 DateTime barTime = norgate.Date.Date
                     + DateTime.Parse(Info[DataSourceParam.time]).TimeOfDay;
@@ -237,24 +244,25 @@ namespace TuringTrader.Simulator
             {
                 lock (_lockNorgate)
                 {
-                    if (!NorgateHelpers.isAPIAvaliable)
+                    if (!NorgateHelpers.IsNorgateDataApiAvailable)
                         throw new Exception(string.Format("{0}: Norgate Data Updater not installed", GetType().Name));
 
-                    //--- Norgate setup
-                    NDU.Api.SetAdjustmentType = GlobalSettings.AdjustForDividends
-                        ? NDU.AdjustmentType.TotalReturn
-                        : NDU.AdjustmentType.CapitalSpecial;
-                    NDU.Api.SetPaddingType = NDU.PaddingType.AllMarketDays;
-
                     //--- run NDU as required
-                    NDU.OperationResult result;
 #if false
                     // this should work, but seems broken as of 01/09/2019
                     // confirmed broken as of 02/10/2023
                     DateTime dbTimeStamp = NDU.Api.LastDatabaseUpdateTime;
 #else
-                    List<NDU.RecOHLC> q = new List<NDU.RecOHLC>();
-                    result = NDU.Api.GetData("$SPX", out q, DateTime.Now - TimeSpan.FromDays(5), DateTime.Now + TimeSpan.FromDays(5));
+                    (var p, var q) = NorgateData.DataAccess.Api.GetData(
+                        "$SPX",
+                        DateTime.Now - TimeSpan.FromDays(5),
+                        DateTime.Now + TimeSpan.FromDays(5),
+                        NorgateData.DataAccess.PaddingType.AllMarketDays,
+                        NorgateData.DataAccess.AdjustmentType.TotalReturn,
+                        -1, // limit
+                        "D", // interval
+                        true, // showIncompleteBar
+                        false); // forceZeroVolumeOnSuspendedBars
 
                     //if (!result.IsSuccess())
                     //    Output.ThrowError("failed to retrieve data for {0}: {1}", "$SPX", result.ErrorMessage);
@@ -271,8 +279,17 @@ namespace TuringTrader.Simulator
                         NorgateHelpers.RunNDU();
 
                     //--- get data from Norgate
-                    List<NDU.RecOHLC> norgateData = new List<NDU.RecOHLC>();
-                    result = NDU.Api.GetData(Info[DataSourceParam.symbolNorgate], out norgateData, startTime, endTime);
+                    (var result, var norgateData) = NorgateData.DataAccess.Api.GetData(
+                        Info[DataSourceParam.symbolNorgate],
+                        startTime, endTime,
+                        NorgateData.DataAccess.PaddingType.AllMarketDays,
+                        GlobalSettings.AdjustForDividends
+                            ? NorgateData.DataAccess.AdjustmentType.TotalReturn
+                            : NorgateData.DataAccess.AdjustmentType.CapitalSpecial,
+                        -1, // limit
+                        "D", // interval
+                        true, // showIncompleteBar
+                        false); // forceZeroVolumeOnSuspendedBars
 
                     if (!result.IsSuccess())
                         Output.ThrowError("failed to retrieve data for {0}: {1}", Info[DataSourceParam.symbolNorgate], result.ErrorMessage);
@@ -306,7 +323,7 @@ namespace TuringTrader.Simulator
             public DataSourceNorgate(Dictionary<DataSourceParam, string> info) : base(info)
             {
                 // make sure Norgate api is properly loaded
-                NorgateHelpers.HandleUnresovledAssemblies();
+                NorgateHelpers.LoadUnresolvedAssemblies();
 
                 if (info[DataSourceParam.name] == info[DataSourceParam.nickName])
                 {
@@ -366,7 +383,7 @@ namespace TuringTrader.Simulator
                 { "$SML", "S&P SmallCap 600 Current & Past" },
                 { "$SP1500", "S&P Composite 1500 Current & Past" },
                 { "$SPDAUDP", "S&P 500 Dividend Aristocrats Current & Past" },
-                { "$SPXESUP", "S&P 500 ESG Current & Past" },
+                { "$SPESG", "S&P 500 ESG Current & Past" },
 
                 { "$RUI", "Russell 1000 Current & Past" },
                 { "$RUT", "Russell 2000 Current & Past" },
@@ -397,8 +414,7 @@ namespace TuringTrader.Simulator
                 {
                     // this code cannot be in the same method
                     // that calls HandleUnresolvedAssemblies
-                    NDW.Watchlist watchlist;
-                    var success = NDU.Api.GetWatchlist(_watchlistNames[_nickname], out watchlist);
+                    (var success, var watchlist) = NorgateData.DataAccess.Api.GetWatchlist(_watchlistNames[_nickname]);
                     _watchlist = watchlist;
                 }
             }
@@ -408,7 +424,7 @@ namespace TuringTrader.Simulator
             public UniverseNorgate(string nickname)
             {
                 // make sure Norgate api is properly loaded
-                NorgateHelpers.HandleUnresovledAssemblies();
+                NorgateHelpers.LoadUnresolvedAssemblies();
 
                 if (!_watchlistNames.ContainsKey(nickname))
                     throw new Exception(string.Format("{0}: no watchlist found for '{1}'", GetType().Name, nickname));
@@ -428,13 +444,13 @@ namespace TuringTrader.Simulator
             {
                 get
                 {
-                    NDW.Watchlist watchlist = (NDW.Watchlist)_watchlist;
+                    var watchlist = (NorgateData.DataAccess.Watchlist)_watchlist;
 
                     if (_constituents == null)
                     {
                         lock (_lockNorgate)
                         {
-                            NDW.SecurityList constituents1;
+                            NorgateData.DataAccess.SecurityList constituents1;
                             var result = watchlist.GetSecurityList(out constituents1);
 
                             if (!result.IsSuccess())
@@ -444,7 +460,7 @@ namespace TuringTrader.Simulator
                         }
                     }
 
-                    NDW.SecurityList constituents = (NDW.SecurityList)_constituents;
+                    var constituents = (NorgateData.DataAccess.SecurityList)_constituents;
                     foreach (var security in constituents)
                     {
                         yield return "norgate#accept_no_data:" + security.Symbol;
@@ -464,7 +480,7 @@ namespace TuringTrader.Simulator
             override public bool IsConstituent(string nickname, DateTime timestamp)
             {
                 int idx = nickname.Contains(":") ? nickname.IndexOf(":") : -1;
-                string datasource = idx > 0 ? nickname.Substring(0, idx - 1).ToLower() : "";
+                string datasource = idx > 0 ? nickname.Substring(0, idx).ToLower() : "";
                 string symbol = nickname.Substring(idx + 1);
 
                 if (datasource.Length > 0 && !datasource.Contains("norgate"))
@@ -474,36 +490,35 @@ namespace TuringTrader.Simulator
                 {
                     var dummy = Constituents.First();
                 }
-                NDW.SecurityList constituents = (NDW.SecurityList)_constituents;
-                NDW.Security security = constituents
+                var constituents = (NorgateData.DataAccess.SecurityList)_constituents;
+                var security = constituents
                     .Where(c => c.Symbol == symbol)
                     .FirstOrDefault();
 
                 if (security == null)
                     return false;
 
-                if (!_constituentsTimeSeries.ContainsKey(security.AssetID))
+                if (!_constituentsTimeSeries.ContainsKey(security.AssetId))
                 {
                     lock (_lockNorgate)
                     {
-                        List<NDU.RecIndicator> timeSeries1;
-                        var result = NDU.Api.GetIndexConstituentTimeSeries(
-                            security.AssetID, out timeSeries1, _nickname,
+                        (var result, var timeSeries1) = NorgateData.DataAccess.Api.GetIndexConstituentTimeSeries(
+                            security.AssetId, _nickname,
                             DateTime.Parse("01/01/1990", CultureInfo.InvariantCulture),
                             DateTime.Now.Date,
-                            NDU.PaddingType.None);
+                            NorgateData.DataAccess.PaddingType.None);
 
                         if (!result.IsSuccess())
                             Output.ThrowError("failed to retrieve constituent time series for {0}: {1}", security.Symbol, result.ErrorMessage);
 
-                        _constituentsTimeSeries[security.AssetID] = timeSeries1;
+                        _constituentsTimeSeries[security.AssetId] = timeSeries1;
                     }
                 }
-                List<NDU.RecIndicator> timeSeries = (List<NDU.RecIndicator>)_constituentsTimeSeries[security.AssetID];
+                var timeSeries = (List<NorgateData.DataAccess.RecIndicator>)_constituentsTimeSeries[security.AssetId];
 
                 // no index? set to zero
-                int index = _consituentsTimeSeriesIndex.ContainsKey(security.AssetID)
-                    ? _consituentsTimeSeriesIndex[security.AssetID]
+                int index = _consituentsTimeSeriesIndex.ContainsKey(security.AssetId)
+                    ? _consituentsTimeSeriesIndex[security.AssetId]
                     : 0;
 
                 // index too far? reset to zero
@@ -516,14 +531,14 @@ namespace TuringTrader.Simulator
                     index++;
 
                 // cache this index to speed up next iteration
-                _consituentsTimeSeriesIndex[security.AssetID] = index;
+                _consituentsTimeSeriesIndex[security.AssetId] = index;
 
                 // reached end of indices
                 // this shouldn't matter, as the simulator core removes stale instruments
                 if (timeSeries[index].Date.Date < timestamp.Date && index == timeSeries.Count - 1)
                     return false;
 
-                return timeSeries[index].value != 0.0 ? true : false;
+                return timeSeries[index].Value != 0.0 ? true : false;
             }
             #endregion
         }

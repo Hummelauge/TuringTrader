@@ -80,15 +80,16 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.IsTrue(barCount == 8064);
 
             var cagr = ((Account_Default)account).AnnualizedReturn;
-            Assert.IsTrue(Math.Abs(cagr - 0.12298366239190828) < 1e-5);
+            Assert.IsTrue(Math.Abs(cagr - 0.12288622191873744) < 1e-5);
 
             var mdd = ((Account_Default)account).MaxDrawdown;
-            Assert.IsTrue(Math.Abs(mdd - 0.56697767504083529) < 1e-5);
+            Assert.IsTrue(Math.Abs(mdd - 0.56697786177284815) < 1e-5);
 
             var trades = account.TradeLog.Count;
-            Assert.IsTrue(trades == 809228);
+            Assert.IsTrue(trades == 809328);
 
-            Assert.IsTrue((end - start).TotalSeconds < 45.0); // ~37s Surface Pro 8, i5-1135G7 @ 2.40GHz - before 2023ii08
+            var time = (end - start).TotalSeconds;
+            Assert.IsTrue(time < 45.0); // ~37s Surface Pro 8, i5-1135G7 @ 2.40GHz - before 2023ii08
         }
     }
 }

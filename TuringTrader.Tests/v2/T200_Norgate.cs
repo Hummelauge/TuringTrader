@@ -82,17 +82,24 @@ namespace TuringTrader.SimulatorV2.Tests
 
         private class Testbed2 : Algorithm
         {
+            private string _universe;
+
+            public Testbed2(string universe)
+            {
+                _universe = universe;
+            }
+
             public override void Run()
             {
-                StartDate = DateTime.Parse("1990-01-01T16:00-05:00");
-                EndDate = DateTime.Parse("2021-12-31T16:00-05:00");
+                //StartDate
+                //EndDate
                 WarmupPeriod = TimeSpan.FromDays(0);
 
                 var allTickers = new HashSet<string>();
 
                 SimLoop(() =>
                 {
-                    var constituents = Universe("$SPX");
+                    var constituents = Universe(_universe);
 
                     foreach (var constituent in constituents)
                         if (!allTickers.Contains(constituent))
@@ -106,15 +113,44 @@ namespace TuringTrader.SimulatorV2.Tests
         [TestMethod]
         public void Test_Universe()
         {
-            var algo = new Testbed2();
-            algo.Run();
-            var result = algo.EquityCurve;
+            var universes = new List<Tuple<string, DateTime, DateTime, double, int>>
+            {
+                //Tuple.Create("$OEX", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 100.38482194979568, 232),
+                Tuple.Create("$SPX", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2021-12-31T16:00-05:00"), 500.99925595238096, 1229),
+                //Tuple.Create("$MID", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 382.63304144775248, 1683),
+                //Tuple.Create("$SML", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 514.48021015761822, 2453),
+                //Tuple.Create("$SP1500", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 1287.242148277875, 4053),
+                //Tuple.Create("$SPDAUDP", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 51.483946293053123, 171),
+                //Tuple.Create("$SPESG", DateTime.Parse("2010-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 126.519023282226, 469),
+                
+                Tuple.Create("$RUI", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 969.85043782837124, 3461),
+                //Tuple.Create("$RUT", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 1925.0939871570345, 10773),
+                //Tuple.Create("$RUA", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 2895.231873905429, 11997),
+                //Tuple.Create("$RMC", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 659.13683596030353, 3003),
+                //Tuple.Create("$RUMIC", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 1170.5858727378868, 7580),
 
-            var avgTickers = result.Average(b => b.Value.Open);
-            Assert.AreEqual(500.93551587301585, avgTickers, 1e-3);
+                Tuple.Create("$NDX", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 89.826736719206068, 455),
+                //Tuple.Create("$NGX", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 9.9985989492119085, 201),
+                //Tuple.Create("$NXTQ", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 23.904845300642148, 362),
 
-            var totTickers = result.Max(b => b.Value.High);
-            Assert.AreEqual(1231, totTickers);
+                Tuple.Create("$DJI", DateTime.Parse("1990-01-01T16:00-05:00"), DateTime.Parse("2023-12-31T16:00-05:00"), 29.996964389959135, 58),
+            };
+
+            foreach(var tuple in universes)
+            {
+                var algo = new Testbed2(tuple.Item1);
+                algo.StartDate = tuple.Item2;
+                algo.EndDate = tuple.Item3;
+                algo.Run();
+                var result = algo.EquityCurve;
+
+                var avgTickers = result.Average(b => b.Value.Open);
+                Assert.AreEqual(tuple.Item4, avgTickers, 1e-3);
+
+                var totTickers = result.Max(b => b.Value.High);
+                Assert.AreEqual(tuple.Item5, totTickers);
+            }
+
         }
     }
 }

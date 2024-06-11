@@ -55,6 +55,7 @@ namespace TuringTrader.SimulatorV2
                 OptimizerParams[param.Name] = param;
 
             Account = new Account_Default(this);
+            TradingCalendar = new TradingCalendar_US(this);
             Plotter = new Plotter(this);
         }
         /// <summary>
@@ -135,36 +136,31 @@ namespace TuringTrader.SimulatorV2
         /// Trading calendar, converting simulation date range to
         /// enumerable of valid trading days.
         /// </summary>
-        public ITradingCalendar TradingCalendar { get; set; } = new TradingCalendar_US();
+        public ITradingCalendar TradingCalendar { get; set; } = null; // instantiated in constructor
 
-        private DateTime? _startDate = null;
         /// <summary>
         /// Simulation start date.
         /// </summary>
-        public DateTime? StartDate { get => _startDate; set { _startDate = value; if (value != null) TradingCalendar.StartDate = (DateTime)_startDate - WarmupPeriod; } }
+        public virtual DateTime? StartDate { get; set; } = null;
 
-        private DateTime? _endDate = null;
         /// <summary>
         /// Simulation end date.
         /// </summary>
-        public DateTime? EndDate { get => _endDate; set { _endDate = value; if (value != null) TradingCalendar.EndDate = (DateTime)value + CooldownPeriod; } }
-
-        private TimeSpan _warmupPeriod = TimeSpan.FromDays(5);
+        public virtual DateTime? EndDate { get; set; } = null;
 
         /// <summary>
         /// Warmup period.This period comes before StartDate. It is crucial
         /// to have enough warmup before beginning to trade, so that
         /// indicators can settle on their correct values.
         /// </summary>
-        public TimeSpan WarmupPeriod { get => _warmupPeriod; set { _warmupPeriod = value; TradingCalendar.StartDate = (DateTime)_startDate - WarmupPeriod; } }
+        public virtual TimeSpan WarmupPeriod { get; set; } = TimeSpan.FromDays(5);
 
-        private TimeSpan _cooldownPeriod = TimeSpan.FromDays(5);
         /// <summary>
         /// Cooldown period. This period follows EndDate. It is important to
         /// add a few days to the end of the backtest to make sure the simulator
         /// can calculate NextSimDate accordingly.
         /// </summary>
-        public TimeSpan CooldownPeriod { get => _cooldownPeriod; set { _cooldownPeriod = value; TradingCalendar.EndDate = (DateTime)_endDate + CooldownPeriod; } }
+        public virtual TimeSpan CooldownPeriod { get; set; } = TimeSpan.FromDays(5);
         /// <summary>
         /// Current simulation timestamp.
         /// </summary>

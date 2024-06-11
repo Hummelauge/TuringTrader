@@ -47,9 +47,13 @@
     <Reference Include="IB.CSharpAPI">
       <HintPath>..\packages\IB.CSharpAPI.9.72.18\IB.CSharpAPI.dll</HintPath>
     </Reference>
-    <Reference Include="norgate.data.dotnet">
-      <HintPath>..\packages\NorgateData.DataAccess\NorgateData.DataAccess\bin\Release\norgate.data.dotnet.dll</HintPath>
-      <Private>false</Private>
+    <Reference Include="NorgateData.DataAccess.API">
+      <HintPath>..\..\..\..\..\..\Program Files\Norgate Data Updater\bin\NorgateData.DataAccess.API.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="NorgateData.DataAccess.Core">
+      <HintPath>..\..\..\..\..\..\Program Files\Norgate Data Updater\bin\NorgateData.DataAccess.Core.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
 

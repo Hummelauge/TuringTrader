@@ -220,13 +220,13 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual(-0.01837332316570307, intercept.Data.Min(b => b.Value));
             Assert.AreEqual(0.010602806675019514, intercept.Data.Max(b => b.Value));
 
-            Assert.AreEqual(13413, intercept.Data.Count);
+            Assert.AreEqual(13413, slope.Data.Count);
             Assert.AreEqual(-5.381165720368713E-89, slope.Data.Average(b => b.Value));
             Assert.AreEqual(-1.4243845454612035E-87, slope.Data.Min(b => b.Value));
             Assert.AreEqual(2.4682782934871896E-87, slope.Data.Max(b => b.Value));
 
-            Assert.AreEqual(13413, intercept.Data.Count);
-            Assert.AreEqual(0.0027804981759415245, r2.Data.Average(b => b.Value));
+            Assert.AreEqual(13413, r2.Data.Count);
+            Assert.AreEqual(0.0027810850572974957, r2.Data.Average(b => b.Value));
             Assert.AreEqual(0.0, r2.Data.Min(b => b.Value));
             Assert.AreEqual(0.03920682704508874, r2.Data.Max(b => b.Value));
         }
