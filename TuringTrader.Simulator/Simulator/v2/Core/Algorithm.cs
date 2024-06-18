@@ -189,7 +189,7 @@ namespace TuringTrader.SimulatorV2
 
         private int? _threadId = null;
         private int? _taskId = null;
-        private List<BarType<OHLCV>> _simLoop(Func<double, OHLCV> innerBarFun, double init = 0.0)
+        private List<BarType<OHLCV>> _simLoop(Func<double, OHLCV> innerBarFun, double init, bool isLambda)
         {
             // NOTE: _simLoop may be reentered by Lambda. However,
             //       this reenantrance may only happen on the same
@@ -233,7 +233,7 @@ namespace TuringTrader.SimulatorV2
                     var simDate = tradingDays[idx];
                     var nextSimDate = tradingDays[Math.Min(tradingDays.Count - 1, idx + 1)];
 
-                    if (simDate >= StartDate && simDate <= EndDate)
+                    if (isLambda || (simDate >= StartDate && simDate <= EndDate))
                     {
                         SimDate = simDate;
                         NextSimDate = nextSimDate;
@@ -267,7 +267,7 @@ namespace TuringTrader.SimulatorV2
         private void _simLoopOuter(Func<OHLCV> innerBarFun)
         {
 
-            var bars = _simLoop((prev) => innerBarFun());
+            var bars = _simLoop((prev) => innerBarFun(), default, false);
 
             //SimDate = default; // we need SimDate to calculate the last asset allocation
             //_cache.Clear(); // we need quote data to calculate the last asset allocation
@@ -342,7 +342,7 @@ namespace TuringTrader.SimulatorV2
                 {
 
                     // run simloop
-                    var bars = _simLoop((prev) => new OHLCV(0.0, 0.0, 0.0, barFun(prev), 0.0), init);
+                    var bars = _simLoop((prev) => new OHLCV(0.0, 0.0, 0.0, barFun(prev), 0.0), init, true);
                     var data = Task.FromResult(bars
                         .Select(ohlcv => new BarType<double>(ohlcv.Date, ohlcv.Value.Close))
                         .ToList());
@@ -362,7 +362,7 @@ namespace TuringTrader.SimulatorV2
             return Lambda(
                 cacheId,
                 (prev) => barFun(),
-                0.0);
+                default);
         }
 
         /// <summary>

@@ -282,8 +282,8 @@ namespace TuringTrader.SimulatorV2
                     {
                         (result, var rawTimeSeries) = NorgateData.DataAccess.Api.GetIndexConstituentTimeSeries(
                             security.AssetId, _norgateNames[_universe].Item2,
-                            TimeZoneInfo.ConvertTime((DateTime)_algorithm.StartDate - TimeSpan.FromDays(5), _algorithm.TradingCalendar.ExchangeTimeZone).Date,
-                            TimeZoneInfo.ConvertTime((DateTime)_algorithm.EndDate, _algorithm.TradingCalendar.ExchangeTimeZone).Date,
+                            TimeZoneInfo.ConvertTime((DateTime)_algorithm.TradingCalendar.StartDate, _algorithm.TradingCalendar.ExchangeTimeZone).Date,
+                            TimeZoneInfo.ConvertTime((DateTime)_algorithm.TradingCalendar.EndDate, _algorithm.TradingCalendar.ExchangeTimeZone).Date,
                             NorgateData.DataAccess.PaddingType.AllCalendarDays);
                         //-1); // limit
 
@@ -359,6 +359,9 @@ namespace TuringTrader.SimulatorV2
                         constituents.Add("norgate:" + security.Symbol);
                     }
                 }
+
+                if (constituents.Count == 0)
+                    Output.WriteWarning(string.Format("No constituents for universe {0} on {1:MM/dd/yyyy}", _universe, _algorithm.SimDate));
 
                 return constituents;
             }

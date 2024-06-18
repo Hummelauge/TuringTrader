@@ -44,15 +44,18 @@ namespace TuringTrader.SimulatorV2.Tests
 
                 SimLoop(() =>
                 {
-                    var emaA = Asset("$SPX").Close.EMA(10)[0];
+                    var emaA = Asset("$SPX").Close.EMA(10);
 
                     var emaB = Lambda("ema-b", (ema) =>
                     {
                         var alpha = 2.0 / (1.0 + 10);
                         return ema + alpha * (Asset("$SPX").Close[0] - ema);
-                    }, 3700.64990234375)[0];
+                    }, 3700.64990234375);
 
-                    if (Math.Abs(emaA - emaB) > 1e-3)
+                    if (emaA.Data.Count != emaB.Data.Count)
+                        ResultsMatch = false;
+
+                    if (Math.Abs(emaA[0] - emaB[0]) > 1e-3)
                         ResultsMatch = false;
                 });
             }
@@ -78,15 +81,18 @@ namespace TuringTrader.SimulatorV2.Tests
 
                 SimLoop(() =>
                 {
-                    var smaA = Asset("$SPX").Close.SMA(10)[0];
+                    var smaA = Asset("$SPX").Close.SMA(10);
 
                     var smaB = Lambda("sma-b", () =>
                     {
                         return Enumerable.Range(0, 10)
                             .Average(t => Asset("$SPX").Close[t]);
-                    })[0];
+                    });
 
-                    if (Math.Abs(smaA - smaB) > 1e-3)
+                    if (smaA.Data.Count != smaB.Data.Count)
+                        ResultsMatch = false;
+
+                    if (Math.Abs(smaA[0] - smaB[0]) > 1e-3)
                         ResultsMatch = false;
                 });
             }
@@ -184,10 +190,10 @@ namespace TuringTrader.SimulatorV2.Tests
             algo.Run();
 
             var sumEMA = algo.EquityCurve.Sum(b => b.Value.Open);
-            Assert.AreEqual(sumEMA, -257008.86804729505, 1e-5);
+            Assert.AreEqual(-256000.51216616677, sumEMA, 1e-5);
 
             var sumSMA = algo.EquityCurve.Sum(b => b.Value.High);
-            Assert.AreEqual(sumSMA, -248093.10192443867, 1e-5);
+            Assert.AreEqual(-248093.10192443867, sumSMA, 1e-5);
         }
     }
 }

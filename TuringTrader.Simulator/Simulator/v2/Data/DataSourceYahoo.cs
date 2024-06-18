@@ -42,6 +42,7 @@ namespace TuringTrader.SimulatorV2
                 algo, info,
                 () =>
                 {   // retrieve data from Yahoo
+                    // broken as of 06/2024. Returns 429, too many requests
                     string url = string.Format(
                         @"http://query1.finance.yahoo.com/v8/finance/chart/"
                         + "{0}"
