@@ -109,8 +109,8 @@ namespace TuringTrader.Optimizer
                     if (v2Instance != null)
                     {
                         // launching v2 algorithms is less convoluted
-                        v2Instance.StartDate = _algoStart;
-                        v2Instance.EndDate = _algoEnd;
+                        v2Instance.StartDate = v2Instance.StartDate;
+                        v2Instance.EndDate = v2Instance.EndDate;
                         v2Instance.Run();
                     }
 
