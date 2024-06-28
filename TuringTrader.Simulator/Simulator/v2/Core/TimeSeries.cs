@@ -410,6 +410,18 @@ namespace TuringTrader.SimulatorV2
         }
 
         /// <summary>
+        /// Create new time series for an asset.
+        /// </summary>
+        /// <param name="owner"></param>
+        /// <param name="name"></param>
+        /// <param name="data">data for time series</param>
+        public TimeSeriesAsset(
+            Algorithm owner, string name,
+            List<BarType<OHLCV>> data)
+            : base(owner, name, data)
+        { }
+
+        /// <summary>
         /// Container class to store meta data for TimeSeriesAsset.
         /// </summary>
         public class MetaType

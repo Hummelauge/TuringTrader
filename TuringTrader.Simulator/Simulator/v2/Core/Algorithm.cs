@@ -27,6 +27,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TuringTrader.Optimizer;
+using TuringTrader.SimulatorV2.Indicators;
 
 namespace TuringTrader.SimulatorV2
 {
@@ -233,7 +234,7 @@ namespace TuringTrader.SimulatorV2
                     var simDate = tradingDays[idx];
                     var nextSimDate = tradingDays[Math.Min(tradingDays.Count - 1, idx + 1)];
 
-                    if (isLambda || (simDate >= StartDate && simDate <= EndDate))
+                    if (isLambda || IsDataSource || (simDate >= StartDate && simDate <= EndDate))
                     {
                         SimDate = simDate;
                         NextSimDate = nextSimDate;
@@ -278,9 +279,20 @@ namespace TuringTrader.SimulatorV2
             var defaultAccount = Account as Account_Default;
             if (defaultAccount != null)
             {
+#if false
+                // retired 2024vi27: fitness = return-on-max-drawdown
                 FitnessReturn = Account.NetAssetValue;
                 FitnessRisk = defaultAccount.MaxDrawdown;
                 FitnessValue = defaultAccount.AnnualizedReturn / defaultAccount.MaxDrawdown;
+#else
+                // new 2024vi27: fitness = martin ratio (ulcer performance index)
+                var equityCurve = new TimeSeriesAsset(this, "equity curve", bars);
+                var ulcerIndex = equityCurve.Close.UlcerIndex(bars.Count)[0];
+
+                FitnessReturn = Account.NetAssetValue;
+                FitnessRisk = defaultAccount.MaxDrawdown;
+                FitnessValue = defaultAccount.AnnualizedReturn / ulcerIndex;
+#endif
             }
 
             EquityCurve = bars;
