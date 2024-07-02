@@ -92,4 +92,7 @@ TYD,"Direxion Daily 7-10 Year Treasury Bull 3X Shares ETF",04/16/2009,01/01/1970
 UGL,"ProShares Ultra Gold ETF",02/11/2010,07/01/1982
 UGLDF,"Credit Suisse VelocityShares 3x Long Gold SP GSCI Gold Index ER ETN",10/17/2011,07/01/1982
 VXX,"Barclays iPath Series B S&P 500 VIX Short-Term Futures ETN",01/18/2018,01/02/2008
-
+GBTC,"Grayscale Bitcoin ETF",05/04/2015,04/28/2013
+IBIT,"iShares Bitcoin Trust ETF",01/11/2024,04/28/2013
+FBTC,"Fidelity Wise Origin Bitcoin ETF",01/11/2024,04/28/2013
+BITO,"ProShares Bitcoin Strategy ETF",10/19/2021,04/28/2013

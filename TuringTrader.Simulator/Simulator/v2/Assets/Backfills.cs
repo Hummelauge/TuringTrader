@@ -484,5 +484,25 @@ namespace TuringTrader.SimulatorV2.Assets
         /// (since Jan 2018, backfilled to Jan 2008
         /// </summary>
         public const string VXX = "splice:VXX,csv:backfills/VXX.csv";
+        /// <summary>
+        /// Grayscale Bitcoin ETF
+        /// (since May 2015, backfilled to Apr 2013
+        /// </summary>
+        public const string GBTC = "splice:GBTC,csv:backfills/GBTC.csv";
+        /// <summary>
+        /// iShares Bitcoin Trust ETF
+        /// (since Jan 2024, backfilled to Apr 2013
+        /// </summary>
+        public const string IBIT = "splice:IBIT,csv:backfills/IBIT.csv";
+        /// <summary>
+        /// Fidelity Wise Origin Bitcoin ETF
+        /// (since Jan 2024, backfilled to Apr 2013
+        /// </summary>
+        public const string FBTC = "splice:FBTC,csv:backfills/FBTC.csv";
+        /// <summary>
+        /// ProShares Bitcoin Strategy ETF
+        /// (since Oct 2021, backfilled to Apr 2013
+        /// </summary>
+        public const string BITO = "splice:BITO,csv:backfills/BITO.csv";
     }
 }
