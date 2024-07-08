@@ -21,6 +21,12 @@
 //              https://www.gnu.org/licenses/agpl-3.0.
 //==============================================================================
 
+//******************************************************************************
+// * * *   T O D O
+// * * *   this template is messy and urgently needs an
+// * * *   overhaul using the v2 engine's features.
+//******************************************************************************
+
 #region libraries
 using OxyPlot;
 using OxyPlot.Axes;
@@ -470,6 +476,11 @@ namespace TuringTrader
             return cagrs;
         }
 
+        protected Dictionary<double, double> _rightTailReturns(string label, double rightTail)
+        {
+            var (leftCagr, rightCagr) = _tailCagr(label, 5, (int)Math.Round(100.0 * rightTail));
+            return rightCagr;
+        }
         protected double _avgMonthlyReturn(string label) => _monthlyReturns(label).Values.Average(r => r);
         protected double _stdMonthlyReturn(string label)
         {
@@ -2106,6 +2117,13 @@ namespace TuringTrader
                 Tuple.Create<string, Func<object>>("martin", () => _ulcerPerformanceIndex(_firstYLabel)),
                 Tuple.Create<string, Func<object>>("nav-end", ()  => 1000.0 * _endValue(_firstYLabel) / _startValue(_firstYLabel)),
                 Tuple.Create<string, Func<object>>("cagr-5th", () => "[" + _leftTailReturns(_firstYLabel, 0.05)
+                    .Where(kv => kv.Key > 0.0 && kv.Key < 25.1
+                        && Math.Abs(kv.Key - Math.Round(kv.Key)) < 1.0 / 24.0)
+                    .Select(kv => kv.Value)
+                    .Aggregate("", (agg, item) => agg
+                        + (agg.Length > 0 ? "," : "")
+                        + string.Format("{0:F2}", 100.0 * item)) + "]"),
+                Tuple.Create<string, Func<object>>("cagr-95th", () => "[" + _rightTailReturns(_firstYLabel, 0.95)
                     .Where(kv => kv.Key > 0.0 && kv.Key < 25.1
                         && Math.Abs(kv.Key - Math.Round(kv.Key)) < 1.0 / 24.0)
                     .Select(kv => kv.Value)
