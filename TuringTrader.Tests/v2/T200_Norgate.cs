@@ -26,6 +26,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 #endregion
 
 namespace TuringTrader.SimulatorV2.Tests
@@ -67,7 +68,6 @@ namespace TuringTrader.SimulatorV2.Tests
                 });
             }
         }
-
         [TestMethod]
         public void Test_DataRetrieval()
         {
@@ -109,7 +109,6 @@ namespace TuringTrader.SimulatorV2.Tests
                 });
             }
         }
-
         [TestMethod]
         public void Test_Universe()
         {
@@ -151,6 +150,42 @@ namespace TuringTrader.SimulatorV2.Tests
                 Assert.AreEqual(tuple.Item5, totTickers);
             }
 
+        }
+
+        private class TestbedMultithreading : Algorithm
+        {
+            public override void Run()
+            {
+                StartDate = DateTime.Parse("1990-01-01T16:00-05:00");
+                EndDate = DateTime.Parse("2023-12-31T16:00-05:00");
+
+                var sumSpx = 0;
+                SimLoop(() =>
+                {
+                    var spx = Universe("norgate:$SPX");
+                    sumSpx += spx.Count;
+                });
+            }
+        }
+        [TestMethod]
+        public void Test_Multithreading()
+        {
+            var taskList = new List<Task>();
+            for (int i = 0; i < 3; i++)
+            {
+                void runTest()
+                {
+                    var algo = new TestbedMultithreading();
+                    algo.Run();
+                }
+#if true
+                taskList.Add(Task.Run(runTest));
+#else
+                runTest();
+#endif
+            }
+            if (taskList.Count > 0)
+                Task.WaitAll(taskList.ToArray());
         }
     }
 }

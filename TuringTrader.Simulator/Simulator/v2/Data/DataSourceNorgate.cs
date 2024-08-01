@@ -261,7 +261,9 @@ namespace TuringTrader.SimulatorV2
                 if (!_norgateNames.ContainsKey(universe))
                     throw new Exception(String.Format("Unknown universe {0}:{1}", "norgate", universe));
 
-                //lock (_lockNorgate)
+                // NOTE: as of 2024viii01, GetWatchlist is not reentrant.
+                //       See multithreading test T200_Norgate
+                lock (_lockNorgate)
                 {
                     // get watchlist object
                     (var result, _watchlist) = NorgateData.DataAccess.Api.GetWatchlist(_norgateNames[universe].Item1);

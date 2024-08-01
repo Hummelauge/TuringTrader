@@ -112,7 +112,7 @@ namespace TuringTrader.BooksAndPubsV2
         /// <summary>
         /// traded stock universe
         /// </summary>
-        protected virtual string UNIVERSE { get; set; } = "$SPX";
+        protected virtual string UNIVERSE => "$SPX";
 
         /// <summary>
         /// day of weekly rebalancing
