@@ -142,6 +142,11 @@ namespace TuringTrader.BooksAndPubsV2
         {
             get => Asset("$SPX").Close.SMA(INDEX_FLT)[0] > Asset("$SPX").Close.SMA(INDEX_TREND)[0];
         }
+
+        /// <summary>
+        /// benchmark used. defaults to S&P 500 total return
+        /// </summary>
+        protected virtual object BENCHMARK { get; set; } = "$SPXTR";
         #endregion
         #region strategy logic
         public override void Run()
@@ -254,7 +259,7 @@ namespace TuringTrader.BooksAndPubsV2
                     Plotter.SelectChart(Name, "Date");
                     Plotter.SetX(SimDate);
                     Plotter.Plot(Name, NetAssetValue);
-                    Plotter.Plot(Asset("$SPXTR").Description, Asset("$SPXTR").Close[0]);
+                    Plotter.Plot(Asset(BENCHMARK).Description, Asset(BENCHMARK).Close[0]);
 
 #if OPTIONAL_CHARTS
                     // this code matches the chart seen
@@ -267,6 +272,12 @@ namespace TuringTrader.BooksAndPubsV2
                     var ema = Asset("$SPXTR").Close.SMA(200);
                     Plotter.Plot(ema.Name, ema[0] / ema[(DateTime)StartDate]);
                     Plotter.Plot("Cash", Cash);
+
+                    // chart market regime filter
+                    Plotter.SelectChart("Allow New Entries", "Date");
+                    Plotter.SetX(SimDate);
+                    Plotter.Plot("Allow New Entries", ALLOW_NEW_ENTRIES ? 1.0 : 0.0);
+                    Plotter.Plot(Asset("$SPXTR").Description, Asset("$SPXTR").Close[0]);
 #endif
                 }
             });
@@ -278,9 +289,10 @@ namespace TuringTrader.BooksAndPubsV2
                 Plotter.AddTargetAllocation();
                 Plotter.AddHistoricalAllocations();
                 Plotter.AddTradeLog();
+                //Plotter.AddParameters();
             }
         }
-        #endregion
+#endregion
     }
 }
 
