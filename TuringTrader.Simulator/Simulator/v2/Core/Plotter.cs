@@ -165,9 +165,9 @@ namespace TuringTrader.SimulatorV2
                     // BUGBUG: this is inaccurate. Due to the fluctuation
                     //         of asset prices, the new line has deviated
                     //         from the previous allocation.
-                    //         However, because typically all assets weights
-                    //         are adjusted simultaneously, this shouldn't
-                    //         matter too much.
+                    //         However, because a typical strategy adjusts
+                    //         all its assets weights simultaneously, this
+                    //         shouldn't matter too much.
                     if (eodAllocation.Count == 0)
                         eodAllocation.Add(Tuple.Create(
                             trade.OrderTicket.SubmitDate,

@@ -69,10 +69,13 @@ namespace TuringTrader.SimulatorV2
 
             public override void Run()
             {
+#if false
+                // retired 2024viiii05: this code does not support nested v1 strategies
+
                 //--- prepare v1 algo for execution
                 _v1Generator.IsDataSource = true;
 
-                //--- run v1 algo
+                //--- run v1 algo and capture positions at end of sim
                 var v1Bars = new List<Simulator.Bar>();
                 var v1Positions = (Dictionary<Simulator.Instrument, int>)null;
                 foreach (var v1Bar in _v1Generator.Run(
@@ -136,6 +139,158 @@ namespace TuringTrader.SimulatorV2
                 ((V1AccountDummy)Account).TradeLog = v2Log;
                 ((V1AccountDummy)Account).Positions = v2Positions;
             }
+#else
+                // new code 2024viiii05: now supporting nested v1 strategies
+
+                //--- prepare v1 algo for execution
+                _v1Generator.IsDataSource = true;
+
+                //--- run v1 algo and capture positions at end of sim
+                var v2Bars = new List<BarType<OHLCV>>();
+                var v2Positions = new Dictionary<DateTime, Dictionary<string, double>>();
+
+                foreach (var v1Bar in _v1Generator.Run(
+                    convertTimeToV1((DateTime)StartDate),
+                    convertTimeToV1((DateTime)EndDate)))
+                {
+                    //--- collect result bars and convert to v2 format
+                    v2Bars.Add(new BarType<OHLCV>(
+                        convertTimeFromV1(v1Bar.Time),
+                        new OHLCV(v1Bar.Open, v1Bar.High, v1Bar.Low, v1Bar.Close, v1Bar.Volume)));
+
+                    //--- collect all end-of-day holdings and convert to v2 format
+                    // NOTE: We need to handle the fact that the V1 engine
+                    //       clears all positions at the end of its sim loop.
+                    if (_v1Generator.Log.Count() > 0 && _v1Generator.Log.Last().OrderTicket.Type != Simulator.OrderType.endOfSimFakeClose)
+                    {
+                        var v2PositionsToday = new Dictionary<string, double>();
+
+                        void getNestedPositions(Simulator.Algorithm v1Algo, double pcntMultiplier)
+                        {
+                            var v1Positions = v1Algo.Positions;
+                            var v1Nav = v1Algo.NetAssetValue[0];
+
+                            foreach (var kv in v1Positions)
+                            {
+                                var v1PosValue = kv.Key.Close[0] * kv.Value;
+                                var v1PosPcnt = v1PosValue / v1Nav;
+
+                                if (kv.Key.DataSource.Algorithm == null)
+                                {
+                                    // position is simple asset
+                                    var nickname = kv.Key.Nickname;
+
+                                    if (!v2PositionsToday.ContainsKey(nickname))
+                                        v2PositionsToday[nickname] = 0.0;
+                                    v2PositionsToday[nickname] += pcntMultiplier * v1PosPcnt;
+                                }
+                                else
+                                {
+                                    // position is child strategy
+                                    getNestedPositions(kv.Key.DataSource.Algorithm, pcntMultiplier * v1PosPcnt);
+                                }
+                            }
+
+                            // treat pending orders as executed
+                            foreach (var order in v1Algo.PendingOrders)
+                            {
+                                var v1OrderValue = order.Instrument.Close[0] * order.Quantity;
+                                var v1OrderPcnt = v1OrderValue / v1Nav;
+
+                                if (order.Instrument.DataSource.Algorithm == null)
+                                {
+                                    // position is simple asset
+                                    var nickname = order.Instrument.Nickname;
+
+                                    if (!v2PositionsToday.ContainsKey(nickname))
+                                        v2PositionsToday[nickname] = 0.0;
+                                    v2PositionsToday[nickname] += pcntMultiplier * v1OrderPcnt;
+                                }
+                                else
+                                {
+                                    // position is child strategy
+                                    getNestedPositions(order.Instrument.DataSource.Algorithm, pcntMultiplier * v1OrderPcnt);
+                                }
+                            }
+
+                            // clean up v2PositionsToday
+                            v2PositionsToday = v2PositionsToday
+                                .Where(kv => Math.Abs(kv.Value) > 1e-3)
+                                .ToDictionary(kv => kv.Key, kv => kv.Value);
+                        }
+                        getNestedPositions(_v1Generator, 1.0);
+
+                        // append to list of positions
+                        v2Positions[v2Bars.Last().Date] = v2PositionsToday;
+                    }
+                }
+
+                if (v2Bars.Count == 0)
+                    throw new Exception(string.Format("no bars received from algorithm '{0}'", _v1Generator.Name));
+
+                //--- get all order dates
+                var v2OrderDates = new HashSet<DateTime>();
+                void getNestedOrderDates(Simulator.Algorithm v1Algo)
+                {
+                    var v1Log = v1Algo.Log;
+                    foreach (var entry in v1Log)
+                    {
+                        switch (entry.OrderTicket.Type)
+                        {
+                            case Simulator.OrderType.closeThisBar:
+                            case Simulator.OrderType.openNextBar:
+                                v2OrderDates.Add(convertTimeFromV1(entry.OrderTicket.QueueTime));
+                                var v1Child = entry.OrderTicket.Instrument.DataSource.Algorithm;
+                                if (v1Child != null)
+                                    getNestedOrderDates(v1Child);
+                                break;
+                        }
+                    }
+                }
+                getNestedOrderDates(_v1Generator);
+
+                //--- create v2 order log from EOD positions and order dates
+                // NOTE: this log has nothing to do with the simulator's order log.
+                //       instead, we create a fake log, based on the historical holdings.
+                var v2Log = new List<IAccount.OrderReceipt>();
+                var previousPositions = new Dictionary<string, double>();
+                foreach (var v2OrderDate in v2OrderDates.OrderBy(d => d))
+                {
+                    var newPositions = v2Positions[v2OrderDate];
+
+                    // combine new positions w/ previous positions to capture all orders
+                    var orderPositions = new Dictionary<string, double>(newPositions);
+                    foreach (var kv in previousPositions)
+                        if (!orderPositions.ContainsKey(kv.Key))
+                            orderPositions[kv.Key] = 0.0;
+
+                    // create orders for each position
+                    foreach (var kv in orderPositions)
+                    {
+                        v2Log.Add(new IAccount.OrderReceipt(
+                            new IAccount.OrderTicket(
+                                v2OrderDate,            // order date
+                                kv.Key,                 // nickname
+                                kv.Value,               // target percentage
+                                OrderType.openNextBar), // order type
+                            v2OrderDate, // fill date
+                            0.0,         // order size
+                            0.0,         // fill price
+                            0.0,         // order amount
+                            0.0));       // friction amount
+                    }
+
+                    previousPositions = newPositions;
+                }
+
+                //--- provide converted v1 results to host
+                EquityCurve = v2Bars;
+                ((V1AccountDummy)Account).TradeLog = v2Log;
+                ((V1AccountDummy)Account).Positions = v2Positions.Count > 0
+                    ? v2Positions[v2Positions.Keys.OrderByDescending(d => d).First()]
+                    : new Dictionary<string, double>(); // TODO: can we return null here?
+            }
+#endif
         }
         #endregion
 

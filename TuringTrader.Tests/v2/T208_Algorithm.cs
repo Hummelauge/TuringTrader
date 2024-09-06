@@ -102,15 +102,17 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual(double.Parse(((string)alloc[0]["Allocation"]).TrimEnd('%')), 125.35, 1e-5);
 
             var last = algo.Plotter.AllData[Simulator.Plotter.SheetNames.LAST_REBALANCE];
-            Assert.IsTrue(last.Count == 1);
-            Assert.IsTrue((DateTime)last[0]["Value"] == DateTime.Parse("2022-07-01T16:00-04:00"));
+            Assert.AreEqual(1, last.Count);
+            Assert.AreEqual(DateTime.Parse("2022-07-01T16:00-04:00"), (DateTime)last[0]["Value"]);
 
             var history = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS_HISTORY];
-            Assert.AreEqual(history.Count, 2);
-            Assert.AreEqual((DateTime)history[0]["Date"], DateTime.Parse("2022-01-03T16:00-05:00"));
-            Assert.AreEqual((string)history[0]["Allocation"], "$SPX=100.00%");
-            Assert.AreEqual((DateTime)history[1]["Date"], DateTime.Parse("2022-07-01T16:00-04:00"));
+            Assert.AreEqual(3, history.Count);
+            Assert.AreEqual((DateTime)history[0]["Date"], DateTime.Parse("2021-12-27T16:00-05:00"));
+            Assert.AreEqual((string)history[0]["Allocation"], "");
+            Assert.AreEqual((DateTime)history[1]["Date"], DateTime.Parse("2022-01-03T16:00-05:00"));
             Assert.AreEqual((string)history[1]["Allocation"], "$SPX=100.00%");
+            Assert.AreEqual((DateTime)history[2]["Date"], DateTime.Parse("2022-07-01T16:00-04:00"));
+            Assert.AreEqual((string)history[2]["Allocation"], "$SPX=100.00%");
 
             // TODO: add checks of trading log here
         }
@@ -209,6 +211,128 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual((string)history[1]["Allocation"], "$SPX=99.84%");
 
             // TODO: add checks of trading log here
+        }
+        #endregion
+        #region nested v1 algorithms
+        private class Testbed_nested_v1 : Algorithm
+        {
+            private class Child_1 : Simulator.Algorithm
+            {
+                //public override bool CanRunAsChild => true;
+                public override IEnumerable<Simulator.Bar> Run(DateTime? startTime, DateTime? endTime)
+                {
+                    StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                    EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                    WarmupStartTime = StartTime;
+
+                    var deposit = 1e6;
+                    Deposit(deposit);
+                    CommissionPerShare = 0.0;
+
+                    var spy = AddDataSource("SPY");
+                    var ief = AddDataSource(new Child_2());
+
+                    foreach (var st in SimTimes)
+                    {
+                        if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
+                        {
+                            var spyShares = (int)Math.Floor(0.60 * NetAssetValue[0] / spy.Instrument.Close[0]);
+                            spy.Instrument.Trade(spyShares - spy.Instrument.Position, Simulator.OrderType.openNextBar);
+
+                            var iefShares = (int)Math.Floor(0.40 * NetAssetValue[0] / ief.Instrument.Close[0]);
+                            ief.Instrument.Trade(iefShares - ief.Instrument.Position, Simulator.OrderType.openNextBar);
+                        }
+
+                        var v = NetAssetValue[0] / deposit;
+                        yield return Simulator.Bar.NewOHLC(
+                            Name,
+                            SimTime[0],
+                            v, v, v, v, 0);
+                    }
+                }
+            }
+            private class Child_2 : Simulator.Algorithm
+            {
+                public override bool CanRunAsChild => true;
+                public override IEnumerable<Simulator.Bar> Run(DateTime? startTime, DateTime? endTime)
+                {
+                    StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                    EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                    WarmupStartTime = StartTime;
+
+                    var deposit = 1e6;
+                    Deposit(deposit);
+                    CommissionPerShare = 0.0;
+
+                    var ief = AddDataSource("IEF");
+
+                    foreach (var st in SimTimes)
+                    {
+                        if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
+                        {
+                            var iefShares = (int)Math.Floor(1.00 * NetAssetValue[0] / ief.Instrument.Close[0]);
+                            ief.Instrument.Trade(iefShares - ief.Instrument.Position, Simulator.OrderType.openNextBar);
+                        }
+
+                        var v = NetAssetValue[0] / deposit;
+                        yield return Simulator.Bar.NewOHLC(
+                            Name,
+                            SimTime[0],
+                            v, v, v, v, 0);
+                    }
+                }
+            }
+
+            public override void Run()
+            {
+                StartDate = DateTime.Parse("2023-01-01T16:00-05:00");
+                EndDate = DateTime.Parse("2023-12-31T16:00-05:00");
+                WarmupPeriod = TimeSpan.FromDays(0);
+                ((Account_Default)Account).Friction = 0.0;
+
+                var child1 = Asset(new Child_1());
+
+                SimLoop(() =>
+                {
+                    if (IsFirstBar)
+                    {
+                        child1.Allocate(1.0, OrderType.closeThisBar);
+                    }
+                });
+
+                Plotter.AddTargetAllocation();
+                Plotter.AddTradeLog();
+                Plotter.AddHistoricalAllocations();
+            }
+        }
+        [TestMethod]
+        public void Test_nested_v1()
+        {
+            var algo = new Testbed_nested_v1();
+            algo.Run();
+
+            var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
+            Assert.AreEqual(2, alloc.Count);
+            Assert.AreEqual("SPY", alloc[0]["Symbol"]);
+            Assert.AreEqual(60.00, double.Parse(alloc[0]["Allocation"].ToString().Replace("%", "")), 0.50);
+            Assert.AreEqual(472.31, double.Parse(alloc[0]["Price"].ToString().Replace("$", "")), 0.10);
+            Assert.AreEqual("IEF", alloc[1]["Symbol"]);
+            Assert.AreEqual(40.00, double.Parse(alloc[1]["Allocation"].ToString().Replace("%", "")), 0.50);
+            Assert.AreEqual(94.20, double.Parse(alloc[1]["Price"].ToString().Replace("$", "")), 0.10);
+
+            var last = algo.Plotter.AllData[Simulator.Plotter.SheetNames.LAST_REBALANCE];
+            Assert.AreEqual(1, last.Count);
+            Assert.AreEqual(DateTime.Parse("2023-12-29T16:00-05:00"), (DateTime)last[0]["Value"]);
+
+            var log = algo.Plotter.AllData["Trade Log"];
+            Assert.AreEqual(1, log.Count);
+
+            var history = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS_HISTORY];
+            Assert.AreEqual(13, history.Count);
+            // TODO: check all entries here
+            Assert.AreEqual(DateTime.Parse("2023-05-31T16:00-04:00"), (DateTime)history[5]["Date"]);
+            Assert.AreEqual(60.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[0].Replace("SPY=", "").Replace("%", "")), 0.10);
+            Assert.AreEqual(40.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("IEF=", "").Replace("%", "")), 0.10);
         }
         #endregion
     }
