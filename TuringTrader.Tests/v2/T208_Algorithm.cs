@@ -335,6 +335,46 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual(40.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("IEF=", "").Replace("%", "")), 0.10);
         }
         #endregion
+        #region v1 Round Robin
+#if false
+        private class Testbed_RoundRobin : BooksAndPubsV2.LazyPortfolio
+        {
+            public override HashSet<Tuple<object, double>> ALLOCATION { get; set; } = new HashSet<Tuple<object, double>>
+            {
+                new Tuple<object, double>(new TuringTrader.com.Algorithms.TTcom_RoundRobin_v3(), 1.0),
+            };
+        }
+
+        [TestMethod]
+        public void Test_v1_RoundRobin()
+        {
+            var algo = new Testbed_RoundRobin();
+            algo.Run();
+
+            var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
+            //Assert.AreEqual(2, alloc.Count);
+            //Assert.AreEqual("SPY", alloc[0]["Symbol"]);
+            //Assert.AreEqual(60.00, double.Parse(alloc[0]["Allocation"].ToString().Replace("%", "")), 0.50);
+            //Assert.AreEqual(472.31, double.Parse(alloc[0]["Price"].ToString().Replace("$", "")), 0.10);
+            //Assert.AreEqual("IEF", alloc[1]["Symbol"]);
+            //Assert.AreEqual(40.00, double.Parse(alloc[1]["Allocation"].ToString().Replace("%", "")), 0.50);
+            //Assert.AreEqual(94.20, double.Parse(alloc[1]["Price"].ToString().Replace("$", "")), 0.10);
+
+            var last = algo.Plotter.AllData[Simulator.Plotter.SheetNames.LAST_REBALANCE];
+            //Assert.AreEqual(1, last.Count);
+            //Assert.AreEqual(DateTime.Parse("2023-12-29T16:00-05:00"), (DateTime)last[0]["Value"]);
+
+            var log = algo.Plotter.AllData["Trade Log"];
+            //Assert.AreEqual(1, log.Count);
+
+            var history = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS_HISTORY];
+            //Assert.AreEqual(13, history.Count);
+            //Assert.AreEqual(DateTime.Parse("2023-05-31T16:00-04:00"), (DateTime)history[5]["Date"]);
+            //Assert.AreEqual(60.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[0].Replace("SPY=", "").Replace("%", "")), 0.10);
+            //Assert.AreEqual(40.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("IEF=", "").Replace("%", "")), 0.10);
+        }
+#endif
+        #endregion
     }
 }
 

@@ -151,7 +151,7 @@ namespace TuringTrader.SimulatorV2
 
                 foreach (var v1Bar in _v1Generator.Run(
                     convertTimeToV1((DateTime)StartDate),
-                    convertTimeToV1((DateTime)EndDate)))
+                    convertTimeToV1((DateTime)EndDate < DateTime.Now ? (DateTime)EndDate : DateTime.Now)))
                 {
                     //--- collect result bars and convert to v2 format
                     v2Bars.Add(new BarType<OHLCV>(
@@ -229,7 +229,10 @@ namespace TuringTrader.SimulatorV2
                     throw new Exception(string.Format("no bars received from algorithm '{0}'", _v1Generator.Name));
 
                 //--- get all order dates
+                // NOTE: we are ignoring the actual order tickets,
+                //       and only collect the queuing dates
                 var v2OrderDates = new HashSet<DateTime>();
+                var v1AlgoDone = new HashSet<int>();
                 void getNestedOrderDates(Simulator.Algorithm v1Algo)
                 {
                     var v1Log = v1Algo.Log;
@@ -239,10 +242,17 @@ namespace TuringTrader.SimulatorV2
                         {
                             case Simulator.OrderType.closeThisBar:
                             case Simulator.OrderType.openNextBar:
-                                v2OrderDates.Add(convertTimeFromV1(entry.OrderTicket.QueueTime));
+                                var v2OrderDate = convertTimeFromV1(entry.OrderTicket.QueueTime);
+                                if (v2OrderDate >= StartDate && v2OrderDate <= EndDate)
+                                   v2OrderDates.Add(v2OrderDate);
                                 var v1Child = entry.OrderTicket.Instrument.DataSource.Algorithm;
                                 if (v1Child != null)
-                                    getNestedOrderDates(v1Child);
+                                {
+                                    var v1ChildHash = v1Child.GetHashCode();
+                                    if (!v1AlgoDone.Contains(v1ChildHash))
+                                        getNestedOrderDates(v1Child);
+                                    v1AlgoDone.Add(v1ChildHash);
+                                }
                                 break;
                         }
                     }
