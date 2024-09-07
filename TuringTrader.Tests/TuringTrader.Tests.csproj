@@ -9,15 +9,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.BeSol\BSOL_Client_JHolzman.cs" Link="v2\BSOL_Client_JHolzman.cs" />
     <Compile Include="..\..\Bertram.Solutions\Algorithms.Glue\GlueLogic.cs" Link="v2\GlueLogic.cs" />
     <Compile Include="..\..\Bertram.Solutions\Algorithms.Glue\GlueLogic_v2.cs" Link="v2\GlueLogic_v2.cs" />
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_BondsNot.cs" Link="v2\TTcom_BondsNot.cs" />
     <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_Buoy.cs" Link="v2\TTcom_Buoy.cs" />
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_Mach2.cs" Link="v2\TTcom_Mach2.cs" />
     <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_MarketVane.cs" Link="v2\TTcom_MarketVane.cs" />
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_MeanKitty.cs" Link="v2\TTcom_MeanKitty.cs" />
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_QuickChange.cs" Link="v2\TTcom_QuickChange.cs" />
     <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_RoundRobin.cs" Link="v2\TTcom_RoundRobin.cs" />
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_StocksOnTheLoose.cs" Link="v2\TTcom_StocksOnTheLoose.cs" />
+    <Compile Include="..\..\Bertram.Solutions\Algorithms.TTcom\TTcom_VixSpritz.cs" Link="v2\TTcom_VixSpritz.cs" />
     <Compile Include="..\BooksAndPubsV2\LazyPortfolios_v2.cs" Link="v2\LazyPortfolios_v2.cs" />
     <Compile Include="..\BooksAndPubs\Assets.cs" Link="v2\Assets.cs" />
+    <Compile Include="..\BooksAndPubs\Clenow_StocksOnTheMove.cs" Link="v2\Clenow_StocksOnTheMove.cs" />
     <Compile Include="..\BooksAndPubs\Indices.cs" Link="v2\Indices.cs" />
     <Compile Include="..\BooksAndPubs\LazyPortfolios.cs" Link="v2\LazyPortfolios.cs" />
+    <Compile Include="..\BooksAndPubs\LI_UniversalInvestmentStrategy.cs" Link="v2\LI_UniversalInvestmentStrategy.cs" />
   </ItemGroup>
 
   <ItemGroup>

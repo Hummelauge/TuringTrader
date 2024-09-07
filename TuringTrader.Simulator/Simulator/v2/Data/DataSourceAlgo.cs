@@ -238,13 +238,17 @@ namespace TuringTrader.SimulatorV2
                     var v1Log = v1Algo.Log;
                     foreach (var entry in v1Log)
                     {
+                        var v2QueueTime = convertTimeFromV1(entry.OrderTicket.QueueTime);
+                        if (v2QueueTime < v2Bars.First().Date || v2QueueTime > v2Bars.Last().Date)
+                            continue;
+
                         switch (entry.OrderTicket.Type)
                         {
                             case Simulator.OrderType.closeThisBar:
                             case Simulator.OrderType.openNextBar:
                                 var v2OrderDate = convertTimeFromV1(entry.OrderTicket.QueueTime);
                                 if (v2OrderDate >= StartDate && v2OrderDate <= EndDate)
-                                   v2OrderDates.Add(v2OrderDate);
+                                    v2OrderDates.Add(v2OrderDate);
                                 var v1Child = entry.OrderTicket.Instrument.DataSource.Algorithm;
                                 if (v1Child != null)
                                 {

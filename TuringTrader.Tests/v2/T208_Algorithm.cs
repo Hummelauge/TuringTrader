@@ -25,6 +25,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using TuringTrader.com.AlgorithmsV2;
 #endregion
 
 namespace TuringTrader.SimulatorV2.Tests
@@ -335,8 +336,8 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual(40.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("IEF=", "").Replace("%", "")), 0.10);
         }
         #endregion
-        #region v1 Round Robin
-#if false
+        #region v1/ v2 meta portfolio
+#if true
         private class Testbed_RoundRobin : BooksAndPubsV2.LazyPortfolio
         {
             public override HashSet<Tuple<object, double>> ALLOCATION { get; set; } = new HashSet<Tuple<object, double>>
@@ -346,9 +347,10 @@ namespace TuringTrader.SimulatorV2.Tests
         }
 
         [TestMethod]
-        public void Test_v1_RoundRobin()
+        public void Test_v1_v2_Meta()
         {
-            var algo = new Testbed_RoundRobin();
+            //var algo = new Testbed_RoundRobin();
+            var algo = new BSOL_Client_JHolzman_Cash_v1();
             algo.Run();
 
             var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
