@@ -25,7 +25,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
-using TuringTrader.com.AlgorithmsV2;
 #endregion
 
 namespace TuringTrader.SimulatorV2.Tests
@@ -224,24 +223,25 @@ namespace TuringTrader.SimulatorV2.Tests
                 {
                     StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00-05:00");
                     EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                    //EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
                     WarmupStartTime = StartTime;
 
                     var deposit = 1e6;
                     Deposit(deposit);
                     CommissionPerShare = 0.0;
 
-                    var spy = AddDataSource("SPY");
-                    var ief = AddDataSource(new Child_2());
+                    var stocks = AddDataSource("SPY");
+                    var bonds = AddDataSource(new Child_2());
 
                     foreach (var st in SimTimes)
                     {
                         if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
                         {
-                            var spyShares = (int)Math.Floor(0.60 * NetAssetValue[0] / spy.Instrument.Close[0]);
-                            spy.Instrument.Trade(spyShares - spy.Instrument.Position, Simulator.OrderType.openNextBar);
+                            var spyShares = (int)Math.Floor(0.60 * NetAssetValue[0] / stocks.Instrument.Close[0]);
+                            stocks.Instrument.Trade(spyShares - stocks.Instrument.Position, Simulator.OrderType.openNextBar);
 
-                            var iefShares = (int)Math.Floor(0.40 * NetAssetValue[0] / ief.Instrument.Close[0]);
-                            ief.Instrument.Trade(iefShares - ief.Instrument.Position, Simulator.OrderType.openNextBar);
+                            var iefShares = (int)Math.Floor(0.40 * NetAssetValue[0] / bonds.Instrument.Close[0]);
+                            bonds.Instrument.Trade(iefShares - bonds.Instrument.Position, Simulator.OrderType.openNextBar);
                         }
 
                         var v = NetAssetValue[0] / deposit;
@@ -265,14 +265,45 @@ namespace TuringTrader.SimulatorV2.Tests
                     Deposit(deposit);
                     CommissionPerShare = 0.0;
 
-                    var ief = AddDataSource("IEF");
+                    var bonds = AddDataSource(new Child_3());
 
                     foreach (var st in SimTimes)
                     {
                         if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
                         {
-                            var iefShares = (int)Math.Floor(1.00 * NetAssetValue[0] / ief.Instrument.Close[0]);
-                            ief.Instrument.Trade(iefShares - ief.Instrument.Position, Simulator.OrderType.openNextBar);
+                            var iefShares = (int)Math.Floor(1.00 * NetAssetValue[0] / bonds.Instrument.Close[0]);
+                            bonds.Instrument.Trade(iefShares - bonds.Instrument.Position, Simulator.OrderType.openNextBar);
+                        }
+
+                        var v = NetAssetValue[0] / deposit;
+                        yield return Simulator.Bar.NewOHLC(
+                            Name,
+                            SimTime[0],
+                            v, v, v, v, 0);
+                    }
+                }
+            }
+            private class Child_3 : Simulator.Algorithm
+            {
+                public override bool CanRunAsChild => true;
+                public override IEnumerable<Simulator.Bar> Run(DateTime? startTime, DateTime? endTime)
+                {
+                    StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                    EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                    WarmupStartTime = StartTime;
+
+                    var deposit = 1e6;
+                    Deposit(deposit);
+                    CommissionPerShare = 0.0;
+
+                    var bonds = AddDataSource("IEF");
+
+                    foreach (var st in SimTimes)
+                    {
+                        if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
+                        {
+                            var iefShares = (int)Math.Floor(1.00 * NetAssetValue[0] / bonds.Instrument.Close[0]);
+                            bonds.Instrument.Trade(iefShares - bonds.Instrument.Position, Simulator.OrderType.openNextBar);
                         }
 
                         var v = NetAssetValue[0] / deposit;
@@ -286,8 +317,8 @@ namespace TuringTrader.SimulatorV2.Tests
 
             public override void Run()
             {
-                StartDate = DateTime.Parse("2023-01-01T16:00-05:00");
-                EndDate = DateTime.Parse("2023-12-31T16:00-05:00");
+                StartDate = StartDate ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                EndDate = EndDate ?? DateTime.Parse("2023-12-31T16:00-05:00");
                 WarmupPeriod = TimeSpan.FromDays(0);
                 ((Account_Default)Account).Friction = 0.0;
 
@@ -310,6 +341,7 @@ namespace TuringTrader.SimulatorV2.Tests
         public void Test_nested_v1()
         {
             var algo = new Testbed_nested_v1();
+            //algo.EndDate = DateTime.Parse("2023-01-05T16:00-05:00");
             algo.Run();
 
             var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
@@ -336,47 +368,86 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual(40.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("IEF=", "").Replace("%", "")), 0.10);
         }
         #endregion
+#if false
         #region v1/ v2 meta portfolio
-#if true
-        private class Testbed_RoundRobin : BooksAndPubsV2.LazyPortfolio
+        // NOTE: this is a complicated issue that arose during testing
+        //       with TuringTrader.com algorithms. It was removed from
+        //       the standard test cases, as it requires a number of
+        //       proprietary algorithms, which we can't disclose here.
+        private class Testbed_v1_v2_Meta : BooksAndPubsV2.LazyPortfolio
         {
+            private class RoundRobinBullPortfolioMockUp : BooksAndPubs.LazyPortfolio
+            {
+                public int FILTER_LENGTH => 20;
+                public int FILTER_STAGES => 5;
+                public override HashSet<Tuple<object, double>> ALLOCATION => new HashSet<Tuple<object, double>>
+                {
+                    new Tuple<object, double>(
+                        new TuringTrader.com.Algorithms.TTcom_RoundRobin.BullMarketStrategy
+                        {
+                            FILTER_LENGTH = FILTER_LENGTH,
+                            FILTER_STAGES = FILTER_STAGES,
+                            ASSETS = TuringTrader.com.Algorithms.TTcom_RoundRobin_Blocks.SPDR_Sectors,
+                        },
+                        0.50),
+                    new Tuple<object, double>(
+                        new TuringTrader.com.Algorithms.TTcom_RoundRobin.BullMarketStrategy
+                        {
+                            FILTER_LENGTH = FILTER_LENGTH,
+                            FILTER_STAGES = FILTER_STAGES,
+                            ASSETS = TuringTrader.com.Algorithms.TTcom_RoundRobin_Blocks.USA_Diversified,
+                        },
+                        0.50),
+                };
+            }
             public override HashSet<Tuple<object, double>> ALLOCATION { get; set; } = new HashSet<Tuple<object, double>>
             {
-                new Tuple<object, double>(new TuringTrader.com.Algorithms.TTcom_RoundRobin_v3(), 1.0),
+#if true
+                new Tuple<object, double>(new RoundRobinBullPortfolioMockUp(), 1.00),
+#else
+                // initial capital ~300k
+                //new Tuple<object, double>(new TTcom_RoundRobin_v3(),           0.18), // https://www.turingtrader.com/portfolios/tt-round-robin/
+                //new Tuple<object, double>(new TTcom_StocksOnTheLoose_v3(),     0.18), // https://www.turingtrader.com/portfolios/tt-stocks-on-the-loose/
+                //new Tuple<object, double>(new TTcom_MeanKitty_v2(),            0.18), // https://www.turingtrader.com/portfolios/tt-mean-kitty/
+                //new Tuple<object, double>(new TTcom_QuickChange(),             0.18), // https://www.turingtrader.com/portfolios/tt-quick-change/
+                //new Tuple<object, double>(new TTcom_VixSpritz_v2_Aggressive(), 0.18), // https://www.turingtrader.com/portfolios/tt-vix-spritz-aggro/
+                //--- 5x 18% = 90%
+                //new Tuple<object, double>(new TTcom_Mach2_v3(),                0.10), // https://www.turingtrader.com/portfolios/tt-mach-2/
+#endif
             };
         }
 
         [TestMethod]
         public void Test_v1_v2_Meta()
         {
-            //var algo = new Testbed_RoundRobin();
-            var algo = new BSOL_Client_JHolzman_Cash_v1();
+            var algo = new Testbed_v1_v2_Meta();
+            algo.EndDate = DateTime.Parse("2024-08-30T16:00-05:00");
             algo.Run();
 
             var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
-            //Assert.AreEqual(2, alloc.Count);
-            //Assert.AreEqual("SPY", alloc[0]["Symbol"]);
-            //Assert.AreEqual(60.00, double.Parse(alloc[0]["Allocation"].ToString().Replace("%", "")), 0.50);
-            //Assert.AreEqual(472.31, double.Parse(alloc[0]["Price"].ToString().Replace("$", "")), 0.10);
-            //Assert.AreEqual("IEF", alloc[1]["Symbol"]);
-            //Assert.AreEqual(40.00, double.Parse(alloc[1]["Allocation"].ToString().Replace("%", "")), 0.50);
-            //Assert.AreEqual(94.20, double.Parse(alloc[1]["Price"].ToString().Replace("$", "")), 0.10);
+            Assert.AreEqual(2, alloc.Count);
+            Assert.AreEqual("SPYG", alloc[0]["Symbol"]);
+            Assert.AreEqual(50.00, double.Parse(alloc[0]["Allocation"].ToString().Replace("%", "")), 0.25);
+            Assert.AreEqual(80.75, double.Parse(alloc[0]["Price"].ToString().Replace("$", "")), 0.10);
+            Assert.AreEqual("XHB", alloc[1]["Symbol"]);
+            Assert.AreEqual(50.00, double.Parse(alloc[1]["Allocation"].ToString().Replace("%", "")), 0.25);
+            Assert.AreEqual(117.39, double.Parse(alloc[1]["Price"].ToString().Replace("$", "")), 0.10);
 
             var last = algo.Plotter.AllData[Simulator.Plotter.SheetNames.LAST_REBALANCE];
-            //Assert.AreEqual(1, last.Count);
-            //Assert.AreEqual(DateTime.Parse("2023-12-29T16:00-05:00"), (DateTime)last[0]["Value"]);
+            Assert.AreEqual(1, last.Count);
+            Assert.AreEqual(DateTime.Parse("2024-08-30T16:00-04:00"), (DateTime)last[0]["Value"]);
 
             var log = algo.Plotter.AllData["Trade Log"];
-            //Assert.AreEqual(1, log.Count);
+            Assert.AreEqual(213, log.Count);
 
             var history = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS_HISTORY];
-            //Assert.AreEqual(13, history.Count);
-            //Assert.AreEqual(DateTime.Parse("2023-05-31T16:00-04:00"), (DateTime)history[5]["Date"]);
-            //Assert.AreEqual(60.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[0].Replace("SPY=", "").Replace("%", "")), 0.10);
-            //Assert.AreEqual(40.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("IEF=", "").Replace("%", "")), 0.10);
+            Assert.AreEqual(213, history.Count);
+            Assert.AreEqual(DateTime.Parse("2007-05-31T16:00-04:00"), (DateTime)history[5]["Date"]);
+            Assert.AreEqual(50.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[0].Replace("XLE=", "").Replace("%", "")), 0.10);
+            Assert.AreEqual(50.00, double.Parse(history[5]["Allocation"].ToString().Split(',')[1].Replace("DIA=", "").Replace("%", "")), 0.10);
         }
-#endif
         #endregion
+#endif
     }
 }
 

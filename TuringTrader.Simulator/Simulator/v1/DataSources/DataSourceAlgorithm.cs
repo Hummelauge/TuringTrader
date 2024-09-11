@@ -112,6 +112,12 @@ namespace TuringTrader.Simulator
                     // therefore, we replace the bar symbol with the algorithm's hash
                     var algoHashHex = string.Format("{0:X}", _algo.Name, _algo.GetHashCode());
 
+                    // let the algorithm know if we are running inside a V2 host
+                    // this info is important to tweak the child's cleanup behavior
+                    var parentAlgo = Simulator as Algorithm;
+                    if (parentAlgo != null)
+                        algoV1.IsRunningInsideV2 = parentAlgo.IsRunningInsideV2;
+
                     foreach (var bar in algoV1.Run(startTime, endTime))
                     {
                         var bar2 = new Bar(
@@ -130,6 +136,10 @@ namespace TuringTrader.Simulator
                             // child algorithms from running one bar ahead of
                             // the main algo. we fix this issue by returning
                             // a dummy bar, announcing the next timestamp.
+
+                            // NOTE: we are concerned about this dummy bar
+                            //       preventing us from setting IsLasBar
+                            //       correctly on the parent algorithm
 
                             var dummy = Bar.NewValue(
                                 null, algoV1.NextSimTime, 0.0);

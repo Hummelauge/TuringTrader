@@ -138,12 +138,12 @@ namespace TuringTrader.SimulatorV2
                 EquityCurve = v2Bars;
                 ((V1AccountDummy)Account).TradeLog = v2Log;
                 ((V1AccountDummy)Account).Positions = v2Positions;
-            }
 #else
                 // new code 2024viiii05: now supporting nested v1 strategies
 
                 //--- prepare v1 algo for execution
                 _v1Generator.IsDataSource = true;
+                _v1Generator.IsRunningInsideV2 = true;
 
                 //--- run v1 algo and capture positions at end of sim
                 var v2Bars = new List<BarType<OHLCV>>();
@@ -303,8 +303,8 @@ namespace TuringTrader.SimulatorV2
                 ((V1AccountDummy)Account).Positions = v2Positions.Count > 0
                     ? v2Positions[v2Positions.Keys.OrderByDescending(d => d).First()]
                     : new Dictionary<string, double>(); // TODO: can we return null here?
-            }
 #endif
+            }
         }
         #endregion
 
