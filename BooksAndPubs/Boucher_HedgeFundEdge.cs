@@ -106,8 +106,8 @@ namespace TuringTrader.BooksAndPubs
             EndTime = Globals.END_TIME - TimeSpan.FromDays(5);
 #else
             WarmupStartTime = Globals.WARMUP_START_TIME;
-            StartTime = Globals.START_TIME;
-            EndTime = Globals.END_TIME;
+            StartTime = startTime ?? Globals.START_TIME;
+            EndTime = endTime ?? Globals.END_TIME;
 #endif
 
             Deposit(Globals.INITIAL_CAPITAL);
