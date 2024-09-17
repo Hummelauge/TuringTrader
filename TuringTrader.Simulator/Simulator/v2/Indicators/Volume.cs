@@ -108,6 +108,20 @@ namespace TuringTrader.SimulatorV2.Indicators
                 .Mul(100.0);
         }
         #endregion
+        #region VWAP
+        /// <summary>
+        /// Calculate volume-weighted average price
+        /// <see href="https://en.wikipedia.org/wiki/Volume-weighted_average_price"/>
+        /// </summary>
+        /// <param name="series">input time series</param>
+        /// <param name="n">averageing length</param>
+        /// <returns>VWAP time series</returns>
+        public static TimeSeriesFloat VWAP(this TimeSeriesAsset series, int n)
+        {
+            return series.TypicalPrice().Mul(series.Volume).Sum(n)
+                .Div(series.Volume.Sum(n));
+        }
+        #endregion
 
         // - Volume Rate of Change
     }
