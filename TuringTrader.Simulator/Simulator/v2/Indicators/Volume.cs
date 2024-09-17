@@ -122,6 +122,21 @@ namespace TuringTrader.SimulatorV2.Indicators
                 .Div(series.Volume.Sum(n));
         }
         #endregion
+        #region VWEMA
+        /// <summary>
+        /// Calculate volume-weighted exponential average price. This
+        /// proprietary indicator is closely related to VWAP, but uses
+        /// exponential moving averages instead.
+        /// </summary>
+        /// <param name="series">input time series</param>
+        /// <param name="n">averageing length</param>
+        /// <returns>VWAP time series</returns>
+        public static TimeSeriesFloat VWEMA(this TimeSeriesAsset series, int n)
+        {
+            return series.TypicalPrice().Mul(series.Volume).EMA(n)
+                .Div(series.Volume.EMA(n));
+        }
+        #endregion
 
         // - Volume Rate of Change
     }
