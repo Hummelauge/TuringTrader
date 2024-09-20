@@ -161,7 +161,7 @@ namespace TuringTrader.SimulatorV2
                     //--- collect all end-of-day holdings and convert to v2 format
                     // NOTE: We need to handle the fact that the V1 engine
                     //       clears all positions at the end of its sim loop.
-                    if (_v1Generator.Log.Count() > 0 && _v1Generator.Log.Last().OrderTicket.Type != Simulator.OrderType.endOfSimFakeClose)
+                    //if (_v1Generator.Log.Count() > 0 && _v1Generator.Log.Last().OrderTicket.Type != Simulator.OrderType.endOfSimFakeClose)
                     {
                         var v2PositionsToday = new Dictionary<string, double>();
 
@@ -235,21 +235,19 @@ namespace TuringTrader.SimulatorV2
                 var v1AlgoDone = new HashSet<int>();
                 void getNestedOrderDates(Simulator.Algorithm v1Algo)
                 {
-                    var v1Log = v1Algo.Log;
-                    foreach (var entry in v1Log)
+                    void processOrderTicket(Simulator.Order order)
                     {
-                        var v2QueueTime = convertTimeFromV1(entry.OrderTicket.QueueTime);
+                        var v2QueueTime = convertTimeFromV1(order.QueueTime);
                         if (v2QueueTime < v2Bars.First().Date || v2QueueTime > v2Bars.Last().Date)
-                            continue;
+                            return;
 
-                        switch (entry.OrderTicket.Type)
+                        switch (order.Type)
                         {
                             case Simulator.OrderType.closeThisBar:
                             case Simulator.OrderType.openNextBar:
-                                var v2OrderDate = convertTimeFromV1(entry.OrderTicket.QueueTime);
-                                if (v2OrderDate >= StartDate && v2OrderDate <= EndDate)
-                                    v2OrderDates.Add(v2OrderDate);
-                                var v1Child = entry.OrderTicket.Instrument.DataSource.Algorithm;
+                                if (v2QueueTime >= StartDate && v2QueueTime <= EndDate)
+                                    v2OrderDates.Add(v2QueueTime);
+                                var v1Child = order.Instrument.DataSource.Algorithm;
                                 if (v1Child != null)
                                 {
                                     var v1ChildHash = v1Child.GetHashCode();
@@ -260,6 +258,14 @@ namespace TuringTrader.SimulatorV2
                                 break;
                         }
                     }
+
+                    // process executed orders
+                    foreach (var entry in v1Algo.Log)
+                        processOrderTicket(entry.OrderTicket);
+
+                    // include pending orders
+                    foreach (var order in v1Algo.PendingOrders)
+                        processOrderTicket(order);
                 }
                 getNestedOrderDates(_v1Generator);
 
@@ -322,8 +328,9 @@ namespace TuringTrader.SimulatorV2
         private static Tuple<List<BarType<OHLCV>>, TimeSeriesAsset.MetaType> AlgoGetAssetInstance(Algorithm owner, Simulator.IAlgorithm generator, string nickname)
         {
             var tradingDays = owner.TradingCalendar.TradingDays;
-            var startDate = tradingDays.First();
-            var endDate = tradingDays.Last();
+            var startDate = tradingDays.First(); // includes warmup
+            //var endDate = tradingDays.Last(); // includes cooldown
+            var endDate = owner.EndDate;
 
             var instanceV1 = (generator as Simulator.Algorithm);
             var instanceV2 = (generator as Algorithm);

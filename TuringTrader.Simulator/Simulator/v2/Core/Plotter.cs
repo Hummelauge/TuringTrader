@@ -133,7 +133,6 @@ namespace TuringTrader.SimulatorV2
                 Plot("Price", string.Format("{0:C2}", prices[ticker]));
             }
 
-            // BUGBUG: this is incorrect as it does not consider the child strategies
             SelectChart(Simulator.Plotter.SheetNames.LAST_REBALANCE, "Key");
             SetX("LastRebalance");
             Plot("Value", lastRebalanceDate);

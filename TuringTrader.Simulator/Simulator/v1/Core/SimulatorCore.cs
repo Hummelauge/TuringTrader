@@ -646,15 +646,18 @@ namespace TuringTrader.Simulator
                 {
                     // this is the default behavior
                     Positions.Clear();
+                    PendingOrders.Clear();
                 }
                 else
                 {
                     // new behavior: keep Positions alive, when
                     // running as DataSource inside V2 engine
                     // BUGBUG: note that this may consume significant memory
+
+                    // new behavior 2024viiii20: keep pending orders alive,
+                    // when running as DataSource inside v2 engine
                 }
 #endif
-                PendingOrders.Clear();
                 SimTime.Clear();
 
                 yield break;

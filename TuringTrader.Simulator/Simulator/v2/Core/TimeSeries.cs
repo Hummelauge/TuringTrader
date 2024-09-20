@@ -484,7 +484,9 @@ namespace TuringTrader.SimulatorV2
         /// <param name="orderPrice"></param>
         public void Allocate(double weight, OrderType orderType, double orderPrice = 0.0)
         {
-            Owner.Account.SubmitOrder(Name, weight, orderType, orderPrice);
+            // NOTE: trades can only be executed within the given sim range
+            if (Owner.SimDate >= Owner.StartDate && Owner.SimDate <= Owner.EndDate)
+                Owner.Account.SubmitOrder(Name, weight, orderType, orderPrice);
         }
 
         /// <summary>

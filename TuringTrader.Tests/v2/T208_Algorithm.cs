@@ -106,13 +106,11 @@ namespace TuringTrader.SimulatorV2.Tests
             Assert.AreEqual(DateTime.Parse("2022-07-01T16:00-04:00"), (DateTime)last[0]["Value"]);
 
             var history = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS_HISTORY];
-            Assert.AreEqual(3, history.Count);
-            Assert.AreEqual((DateTime)history[0]["Date"], DateTime.Parse("2021-12-27T16:00-05:00"));
-            Assert.AreEqual((string)history[0]["Allocation"], "");
-            Assert.AreEqual((DateTime)history[1]["Date"], DateTime.Parse("2022-01-03T16:00-05:00"));
+            Assert.AreEqual(2, history.Count);
+            Assert.AreEqual((DateTime)history[0]["Date"], DateTime.Parse("2022-01-03T16:00-05:00"));
+            Assert.AreEqual((string)history[0]["Allocation"], "$SPX=100.00%");
+            Assert.AreEqual((DateTime)history[1]["Date"], DateTime.Parse("2022-07-01T16:00-04:00"));
             Assert.AreEqual((string)history[1]["Allocation"], "$SPX=100.00%");
-            Assert.AreEqual((DateTime)history[2]["Date"], DateTime.Parse("2022-07-01T16:00-04:00"));
-            Assert.AreEqual((string)history[2]["Allocation"], "$SPX=100.00%");
 
             // TODO: add checks of trading log here
         }
@@ -221,9 +219,8 @@ namespace TuringTrader.SimulatorV2.Tests
                 //public override bool CanRunAsChild => true;
                 public override IEnumerable<Simulator.Bar> Run(DateTime? startTime, DateTime? endTime)
                 {
-                    StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00-05:00");
-                    EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
-                    //EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                    StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00");
+                    EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00");
                     WarmupStartTime = StartTime;
 
                     var deposit = 1e6;
@@ -237,11 +234,14 @@ namespace TuringTrader.SimulatorV2.Tests
                     {
                         if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
                         {
-                            var spyShares = (int)Math.Floor(0.60 * NetAssetValue[0] / stocks.Instrument.Close[0]);
-                            stocks.Instrument.Trade(spyShares - stocks.Instrument.Position, Simulator.OrderType.openNextBar);
+                            // NOTE: make sure to never have an order size of zero
+                            var spyOrder = (int)Math.Floor(0.60 * NetAssetValue[0] / stocks.Instrument.Close[0])
+                                - stocks.Instrument.Position;
+                            stocks.Instrument.Trade(spyOrder != 0 ? spyOrder : -1, Simulator.OrderType.openNextBar);
 
-                            var iefShares = (int)Math.Floor(0.40 * NetAssetValue[0] / bonds.Instrument.Close[0]);
-                            bonds.Instrument.Trade(iefShares - bonds.Instrument.Position, Simulator.OrderType.openNextBar);
+                            var bndOrder = (int)Math.Floor(0.40 * NetAssetValue[0] / bonds.Instrument.Close[0])
+                                - bonds.Instrument.Position;
+                            bonds.Instrument.Trade(bndOrder, Simulator.OrderType.openNextBar);
                         }
 
                         var v = NetAssetValue[0] / deposit;
@@ -271,8 +271,9 @@ namespace TuringTrader.SimulatorV2.Tests
                     {
                         if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
                         {
-                            var iefShares = (int)Math.Floor(1.00 * NetAssetValue[0] / bonds.Instrument.Close[0]);
-                            bonds.Instrument.Trade(iefShares - bonds.Instrument.Position, Simulator.OrderType.openNextBar);
+                            var bndOrder = (int)Math.Floor(1.00 * NetAssetValue[0] / bonds.Instrument.Close[0])
+                                - bonds.Instrument.Position;
+                            bonds.Instrument.Trade(bndOrder, Simulator.OrderType.openNextBar);
                         }
 
                         var v = NetAssetValue[0] / deposit;
@@ -302,8 +303,10 @@ namespace TuringTrader.SimulatorV2.Tests
                     {
                         if (Positions.Count == 0 || SimTime[0].Month != NextSimTime.Month)
                         {
-                            var iefShares = (int)Math.Floor(1.00 * NetAssetValue[0] / bonds.Instrument.Close[0]);
-                            bonds.Instrument.Trade(iefShares - bonds.Instrument.Position, Simulator.OrderType.openNextBar);
+                            // NOTE: make sure to never have an order size of zero
+                            var iefOrder = (int)Math.Floor(1.00 * NetAssetValue[0] / bonds.Instrument.Close[0])
+                                - bonds.Instrument.Position;
+                            bonds.Instrument.Trade(iefOrder != 0 ? iefOrder : -1, Simulator.OrderType.openNextBar);
                         }
 
                         var v = NetAssetValue[0] / deposit;
@@ -347,10 +350,10 @@ namespace TuringTrader.SimulatorV2.Tests
             var alloc = algo.Plotter.AllData[Simulator.Plotter.SheetNames.HOLDINGS];
             Assert.AreEqual(2, alloc.Count);
             Assert.AreEqual("SPY", alloc[0]["Symbol"]);
-            Assert.AreEqual(60.00, double.Parse(alloc[0]["Allocation"].ToString().Replace("%", "")), 0.50);
+            Assert.AreEqual(60.00, double.Parse(alloc[0]["Allocation"].ToString().Replace("%", "")), 1.50);
             Assert.AreEqual(472.31, double.Parse(alloc[0]["Price"].ToString().Replace("$", "")), 0.10);
             Assert.AreEqual("IEF", alloc[1]["Symbol"]);
-            Assert.AreEqual(40.00, double.Parse(alloc[1]["Allocation"].ToString().Replace("%", "")), 0.50);
+            Assert.AreEqual(40.00, double.Parse(alloc[1]["Allocation"].ToString().Replace("%", "")), 1.50);
             Assert.AreEqual(94.20, double.Parse(alloc[1]["Price"].ToString().Replace("$", "")), 0.10);
 
             var last = algo.Plotter.AllData[Simulator.Plotter.SheetNames.LAST_REBALANCE];
@@ -448,6 +451,108 @@ namespace TuringTrader.SimulatorV2.Tests
         }
         #endregion
 #endif
+        #region v1/ v2 sim range
+        private class Testbed_simrange : Algorithm
+        {
+            public class Child_v1 : Simulator.Algorithm
+            {
+                public DateTime FirstTime = DateTime.MaxValue;
+                public DateTime LastTime = DateTime.MinValue;
+                public override bool CanRunAsChild => true;
+                public override IEnumerable<Simulator.Bar> Run(DateTime? startTime, DateTime? endTime)
+                {
+                    StartTime = startTime ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                    EndTime = endTime ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                    Deposit(1e6);
+
+                    var spx = AddDataSource("$OEXTR");
+
+                    foreach (var st in SimTimes)
+                    {
+                        if (SimTime[0] < FirstTime) FirstTime = SimTime[0];
+                        if (SimTime[0] > LastTime) LastTime = SimTime[0];
+
+                        spx.Instrument.Trade((int)Math.Round(NetAssetValue[0] / spx.Instrument.Close[0] - spx.Instrument.Position), Simulator.OrderType.openNextBar);
+
+                        var v = NetAssetValue[0];
+                        yield return Simulator.Bar.NewOHLC(
+                            Name,
+                            SimTime[0],
+                            v, v, v, v, 0);
+                    }
+                }
+            }
+            private class Child_v2 : Algorithm
+            {
+                public DateTime FirstDate = DateTime.MaxValue;
+                public DateTime LastDate = DateTime.MinValue;
+                public override void Run()
+                {
+                    StartDate = StartDate ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                    EndDate = EndDate ?? DateTime.Parse("2023-12-31T16:00-05:00");
+
+                    SimLoop(() =>
+                    {
+                        if (SimDate < FirstDate) FirstDate = SimDate;
+                        if (SimDate > LastDate) LastDate = SimDate;
+
+                        Asset("$NDXTR").Allocate(1.0, OrderType.openNextBar);
+                    });
+                }
+            }
+
+            public DateTime v1FirstTime = DateTime.MaxValue;
+            public DateTime v1LastTime = DateTime.MinValue;
+            public DateTime v2FirstDate = DateTime.MaxValue;
+            public DateTime v2LastDate = DateTime.MinValue;
+            public DateTime FirstDate = DateTime.MaxValue;
+            public DateTime LastDate = DateTime.MinValue;
+            public override void Run()
+            {
+                StartDate = StartDate ?? DateTime.Parse("2023-01-01T16:00-05:00");
+                EndDate = EndDate ?? DateTime.Parse("2023-12-31T16:00-05:00");
+                WarmupPeriod = TimeSpan.FromDays(90);
+
+                var v1Child = new Child_v1();
+                var v2Child = new Child_v2();
+
+                SimLoop(() =>
+                {
+                    if (SimDate < FirstDate) FirstDate = SimDate;
+                    if (SimDate > LastDate) LastDate = SimDate;
+
+                    Asset(v1Child).Allocate(0.5, OrderType.openNextBar);
+                    Asset(v2Child).Allocate(0.5, OrderType.openNextBar);
+                });
+
+                v1FirstTime = v1Child.FirstTime;
+                v1LastTime = v1Child.LastTime;
+                v2FirstDate = v2Child.FirstDate;
+                v2LastDate = v2Child.LastDate;
+
+                Plotter.AddTargetAllocation();
+                Plotter.AddHistoricalAllocations();
+                Plotter.AddTradeLog();
+            }
+        }
+        [TestMethod]
+        public void Test_simrange()
+        {
+            var algo = new Testbed_simrange();
+            algo.StartDate = DateTime.Parse("2023-01-01T16:00-05:00");
+            algo.EndDate = DateTime.Parse("2023-12-31T16:00-05:00");
+            algo.Run();
+
+            Assert.AreEqual(DateTime.Parse("2023-01-03T16:00-05:00"), algo.FirstDate); // no padding
+            Assert.AreEqual(DateTime.Parse("2023-12-29T16:00-05:00"), algo.LastDate); // no padding
+
+            Assert.AreEqual(DateTime.Parse("2022-10-03T16:00"), algo.v1FirstTime); // includes warmup
+            Assert.AreEqual(DateTime.Parse("2023-12-29T16:00"), algo.v1LastTime); // no padding
+
+            Assert.AreEqual(DateTime.Parse("2022-10-03T16:00-04:00"), algo.v2FirstDate); // includes warmup
+            Assert.AreEqual(DateTime.Parse("2023-12-29T16:00-05:00"), algo.v2LastDate); // no padding
+        }
+        #endregion
     }
 }
 

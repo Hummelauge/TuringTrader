@@ -234,7 +234,10 @@ namespace TuringTrader.SimulatorV2
                     var simDate = tradingDays[idx];
                     var nextSimDate = tradingDays[Math.Min(tradingDays.Count - 1, idx + 1)];
 
-                    if (isLambda || IsDataSource || (simDate >= StartDate && simDate <= EndDate))
+                    // NOTE: generally, we only call the client code within the sim range.
+                    //       Lambdas are an exception here, as they likely require a warmup.
+                    //       Data sources have their range set to include the parent's warmup.
+                    if (isLambda || (simDate >= StartDate && simDate <= EndDate && simDate <= DateTime.Now))
                     {
                         SimDate = simDate;
                         NextSimDate = nextSimDate;
