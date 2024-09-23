@@ -40,7 +40,7 @@ namespace TuringTrader.BooksAndPubsV2
         public virtual HashSet<Tuple<object, double>> ALLOCATION { get; set; }
         public virtual object BENCH { get; set; } = Benchmark.PORTFOLIO_60_40;
         public virtual List<object> BENCHES { get; set; } = null;
-        public virtual bool IsTradingDay => IsFirstBar || SimDate.Month != NextSimDate.Month; // end of month
+        public virtual bool IS_TRADING_DAY => IsFirstBar || SimDate.Month != NextSimDate.Month; // end of month
         #endregion
         #region strategy logic
         public override void Run()
@@ -58,7 +58,7 @@ namespace TuringTrader.BooksAndPubsV2
 
             SimLoop(() =>
             {
-                if (IsTradingDay)
+                if (IS_TRADING_DAY)
                 {
                     foreach (var asset in ALLOCATION)
                         Asset(asset.Item1).Allocate(
