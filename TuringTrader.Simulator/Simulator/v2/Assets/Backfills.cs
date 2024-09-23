@@ -488,7 +488,7 @@ namespace TuringTrader.SimulatorV2.Assets
         /// VIXY - ProShares VIX Short-Term Futures ETF
         /// (since Jan 2011, backfilled to Jan 2008)
         /// </summary>
-        public const string VIXY = "splice:VIXYm,csv:backfills/VIXY.csv";
+        public const string VIXY = "splice:VIXY,csv:backfills/VIXY.csv";
         /// <summary>
         /// Grayscale Bitcoin ETF
         /// (since May 2015, backfilled to Apr 2013
