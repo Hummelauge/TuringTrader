@@ -289,7 +289,8 @@ namespace TuringTrader.SimulatorV2
                 FitnessValue = defaultAccount.AnnualizedReturn / defaultAccount.MaxDrawdown;
 #else
                 // new 2024vi27: fitness = martin ratio (ulcer performance index)
-                var equityCurve = new TimeSeriesAsset(this, "equity curve", bars);
+                var name = string.Format("{0}-{1:X}", GetType().Name, GetHashCode());
+                var equityCurve = new TimeSeriesAsset(this, name, bars);
                 var ulcerIndex = equityCurve.Close.UlcerIndex(bars.Count)[0];
 
                 FitnessReturn = Account.NetAssetValue;
