@@ -41,6 +41,7 @@ namespace TuringTrader.BooksAndPubsV2
         public virtual object BENCH { get; set; } = Benchmark.PORTFOLIO_60_40;
         public virtual List<object> BENCHES { get; set; } = null;
         public virtual bool IS_TRADING_DAY => IsFirstBar || SimDate.Month != NextSimDate.Month; // end of month
+        public virtual double MGMT_FEE { get; set; } = 0.0;
         #endregion
         #region strategy logic
         public override void Run()
@@ -56,6 +57,7 @@ namespace TuringTrader.BooksAndPubsV2
 
             //========== simulation loop ==========
 
+            double accruedFeeDollars = 0.0;
             SimLoop(() =>
             {
                 if (IS_TRADING_DAY)
@@ -64,6 +66,13 @@ namespace TuringTrader.BooksAndPubsV2
                         Asset(asset.Item1).Allocate(
                             autoAlloc ? 1.0 / ALLOCATION.Count : asset.Item2,
                             OrderType.openNextBar);
+                }
+
+                accruedFeeDollars += NetAssetValue * MGMT_FEE / 252.0;
+                if (SimDate.Month != NextSimDate.Month)
+                {
+                    ((Account_Default)Account).Deposit(-accruedFeeDollars / NetAssetValue);
+                    accruedFeeDollars = 0.0;
                 }
 
                 // plotter output

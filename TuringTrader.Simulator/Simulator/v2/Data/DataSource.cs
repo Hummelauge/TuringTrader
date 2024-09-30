@@ -503,8 +503,9 @@ namespace TuringTrader.SimulatorV2
             return dst;
         }
 
-        private static object _lockGetMeta = new object();
-        private static object _lockGetData = new object();
+        // FIXME: these are public, so that the v1 engine can access them
+        public static object _lockGetMeta = new object();
+        public static object _lockGetData = new object();
 
         /// <summary>
         /// Helper function to load, parse, and extract data through a disk cache. 

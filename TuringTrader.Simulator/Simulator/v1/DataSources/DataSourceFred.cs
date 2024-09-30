@@ -40,8 +40,14 @@ namespace TuringTrader.Simulator
         private class DataSourceFred : DataSource
         {
             #region internal data
+#if true
+            // make sure we properly lock cache across engine versions
+            private static object _lockGetMeta = SimulatorV2.DataSource._lockGetMeta;
+            private static object _lockGetData = SimulatorV2.DataSource._lockGetData;
+#else
             private static object _lockGetMeta = new object();
             private static object _lockGetData = new object();
+#endif
             #endregion
             #region internal helpers
             private static object _lockCache = new object();
