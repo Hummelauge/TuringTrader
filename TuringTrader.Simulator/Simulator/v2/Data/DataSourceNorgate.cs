@@ -380,6 +380,11 @@ namespace TuringTrader.SimulatorV2
 
         private static List<BarType<OHLCV>> NorgateLoadData(Algorithm owner, Dictionary<DataSourceParam, string> info)
         {
+            // FIXME: we have seen Norgate come back with an error code, while
+            //        the database was busy updating. Moving forward, we should
+            //        probably handle that more gracefully by first waiting for
+            //        a minute, and then retrying.
+
             var tradingDays = owner.TradingCalendar.TradingDays;
             var startDate = tradingDays.First();
             var endDate = tradingDays
