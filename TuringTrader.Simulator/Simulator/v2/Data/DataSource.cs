@@ -562,15 +562,19 @@ namespace TuringTrader.SimulatorV2
                     //--- 2) if failed, try to retrieve from web
                     if (parsedData == null)
                     {
+                        // try loading data no more than twice
                         var tmpData = (string)null;
-                        try
+                        for (int i = 0; i < 2; i++)
                         {
-                            tmpData = getData();
-                        }
-                        catch(Exception ex)
-                        {
-                            // retry once
-                            tmpData = getData();
+                            try
+                            {
+                                tmpData = getData();
+                                break;
+                            }
+                            catch (Exception /*ex*/)
+                            {
+                                // ignore
+                            }
                         }
 
                         parsedData = parseData(tmpData);
