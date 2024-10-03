@@ -20,13 +20,13 @@
 
   <ItemGroup>
     <PackageReference Include="AvalonLibrary" Version="3.0.0" />
-    <PackageReference Include="NetOfficeFw.Core" Version="1.9.5">
+    <PackageReference Include="NetOfficeFw.Core" Version="1.9.7">
       <NoWarn>NU1701</NoWarn>
     </PackageReference>
-    <PackageReference Include="NetOfficeFw.Excel" Version="1.9.5">
+    <PackageReference Include="NetOfficeFw.Excel" Version="1.9.7">
       <NoWarn>NU1701</NoWarn>
     </PackageReference>
-    <PackageReference Include="OxyPlot.Wpf" Version="2.1.2" />
+    <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>
