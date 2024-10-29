@@ -28,12 +28,10 @@
 #region libraries
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TuringTrader.Algorithms.Glue;
 using TuringTrader.Indicators;
 using TuringTrader.Optimizer;
 using TuringTrader.Simulator;
-using TuringTrader.Support;
 #endregion
 
 namespace TuringTrader.BooksAndPubs
@@ -54,7 +52,7 @@ namespace TuringTrader.BooksAndPubs
     // (5) CRB index and 20-wk MA. If CRB Index is below MA, give
     //     +1 point, otherwise give 0 points.
     #region Heine Bond Model core
-    public abstract class Boucher_HeineBondModel_Core: AlgorithmPlusGlue
+    public abstract class Boucher_HeineBondModel_Core : AlgorithmPlusGlue
     {
         public override string Name => string.Format("Heine Bond Model");
 
@@ -66,7 +64,7 @@ namespace TuringTrader.BooksAndPubs
         // In our opinion only (2) makes sense, because we want to consider
         // the trade asset's price action. However, we tend to believe that
         // Heine envisioned option (1).
-        public virtual object ASSET { get; set; } = Assets.IEF; 
+        public virtual object ASSET { get; set; } = Assets.IEF;
         public virtual object BOND_IDX { get => ASSET; set { } } // Heine uses Dow Jones 20 Bond Price Index here?
         [OptimizerParam(30, 130, 5)]
         public virtual int BOND_PER { get; set; } = 24 * 5;
@@ -260,7 +258,7 @@ namespace TuringTrader.BooksAndPubs
         public override string Name => base.Name + " (SHY)";
         public override object ASSET => Assets.SHY;
     }
-    public class Boucher_HeineBondModel_IEF: Boucher_HeineBondModel_Core
+    public class Boucher_HeineBondModel_IEF : Boucher_HeineBondModel_Core
     {
         public override string Name => base.Name + " (IEF)";
         public override object ASSET => Assets.IEF;
@@ -289,6 +287,16 @@ namespace TuringTrader.BooksAndPubs
     {
         public override string Name => base.Name + " (JNK)";
         public override object ASSET => Assets.JNK;
+    }
+    public class Boucher_HeineBondModel_UST : Boucher_HeineBondModel_Core
+    {
+        public override string Name => base.Name + " (UST)";
+        public override object ASSET => Assets.UST;
+    }
+    public class Boucher_HeineBondModel_TYD : Boucher_HeineBondModel_Core
+    {
+        public override string Name => base.Name + " (TYD)";
+        public override object ASSET => Assets.TYD;
     }
     #endregion
 
