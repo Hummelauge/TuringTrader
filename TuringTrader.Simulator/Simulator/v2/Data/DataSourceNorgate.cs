@@ -380,119 +380,126 @@ namespace TuringTrader.SimulatorV2
 
         private static List<BarType<OHLCV>> NorgateLoadData(Algorithm owner, Dictionary<DataSourceParam, string> info)
         {
-            // FIXME: we have seen Norgate come back with an error code, while
-            //        the database was busy updating. Moving forward, we should
-            //        probably handle that more gracefully by first waiting for
-            //        a minute, and then retrying.
-
             var tradingDays = owner.TradingCalendar.TradingDays;
             var startDate = tradingDays.First();
             var endDate = tradingDays
                 .Where(t => t <= DateTime.Now)
                 .Last();
 
-            //lock (_lockNorgate)
+            // lock while running Norgate's Data Updater.
+            // this solution was introduced after observing the following error:
+            // failed to load data for COP: Unable to obtain a read lock on
+            // database is not available - this is a temporary issue due to
+            // a high volume of critical writes to a particular database
+
+            // NOTE: DataSource._loadDataHelper contains retry logic
+
+            lock (_lockNorgate)
             {
-                //if (!NorgateHelpers.IsNorgateDataApiAvailable)
-                //    Output.ThrowError("Norgate Data Updater not installed");
+                // this will block while inside RunNDU()
+            }
 
-                //--- run NDU as required
+            //if (!NorgateHelpers.IsNorgateDataApiAvailable)
+            //    Output.ThrowError("Norgate Data Updater not installed");
+
+            //--- run NDU as required
 #if false
-                // this should work, but seems broken as of 01/09/2019
-                // confirmed broken 12/25/2022
-                // confirmed broken 06/11/2024
-                DateTime dbTimeStamp = NorgateData.DataAccess.Api.LastDatabaseUpdateTime;
+            // this should work, but seems broken as of 01/09/2019
+            // confirmed broken 12/25/2022
+            // confirmed broken 06/11/2024
+            DateTime dbTimeStamp = NorgateData.DataAccess.Api.LastDatabaseUpdateTime;
 #else
-                var exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById(info[DataSourceParam.timezone]);
-                var timeOfDay = DateTime.Parse(info[DataSourceParam.time]).TimeOfDay;
+            var exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById(info[DataSourceParam.timezone]);
+            var timeOfDay = DateTime.Parse(info[DataSourceParam.time]).TimeOfDay;
 
-                (var p, var q) = NorgateData.DataAccess.Api.GetData(
-                    "$SPX",
-                    DateTime.Now - TimeSpan.FromDays(5), DateTime.Now + TimeSpan.FromDays(5),
-                    NorgateData.DataAccess.PaddingType.AllMarketDays,
-                    NorgateData.DataAccess.AdjustmentType.TotalReturn,
-                    -1, // limit
-                    "D", // interval
-                    true, // showIncompleteBar
-                    false); // forceZeroVolumeOnSuspendedBars
+            (var p, var q) = NorgateData.DataAccess.Api.GetData(
+                "$SPX",
+                DateTime.Now - TimeSpan.FromDays(5), DateTime.Now + TimeSpan.FromDays(5),
+                NorgateData.DataAccess.PaddingType.AllMarketDays,
+                NorgateData.DataAccess.AdjustmentType.TotalReturn,
+                -1, // limit
+                "D", // interval
+                true, // showIncompleteBar
+                false); // forceZeroVolumeOnSuspendedBars
 
-                // NOTE: we don't test for success here, as we will get an error,
-                //       if the database hasn't been updated in a long time.
+            // NOTE: we don't test for success here, as we will get an error,
+            //       if the database hasn't been updated in a long time.
 
-                DateTime dbLastQuote = q.Count > 0
-                    ? q
-                        .Select(ohlc => ohlc.Date)
-                        .OrderByDescending(d => d)
-                        .First()
-                        .Date + timeOfDay
-                    : default(DateTime);
+            DateTime dbLastQuote = q.Count > 0
+                ? q
+                    .Select(ohlc => ohlc.Date)
+                    .OrderByDescending(d => d)
+                    .First()
+                    .Date + timeOfDay
+                : default(DateTime);
 
-                var dbTimeStamp = TimeZoneInfo.ConvertTimeToUtc(dbLastQuote, exchangeTimeZone).ToLocalTime();
+            var dbTimeStamp = TimeZoneInfo.ConvertTimeToUtc(dbLastQuote, exchangeTimeZone).ToLocalTime();
 #endif
 
-                if (endDate > dbTimeStamp)
-                    NorgateHelpers.RunNDU();
+            if (endDate > dbTimeStamp)
+                NorgateHelpers.RunNDU();
 
-                //--- retrieve data from Norgate
-                (var result, var norgateData) = NorgateData.DataAccess.Api.GetData(
-                    info[DataSourceParam.symbolNorgate],
-                    startDate, endDate,
-                    NorgateData.DataAccess.PaddingType.AllMarketDays,
-                    NorgateData.DataAccess.AdjustmentType.TotalReturn,
-                    -1, // limit
-                    "D", // interval
-                    true, // showIncompleteBar
-                    false); // forceZeroVolumeOnSuspendedBars
+            //--- retrieve data from Norgate
+            (var result, var norgateData) = NorgateData.DataAccess.Api.GetData(
+                info[DataSourceParam.symbolNorgate],
+                startDate, endDate,
+                NorgateData.DataAccess.PaddingType.AllMarketDays,
+                NorgateData.DataAccess.AdjustmentType.TotalReturn,
+                -1, // limit
+                "D", // interval
+                true, // showIncompleteBar
+                false); // forceZeroVolumeOnSuspendedBars
 
-                if (!result.IsSuccess())
-                    Output.ThrowError("failed to load data for {0}: {1}", info[DataSourceParam.symbolNorgate], result.ErrorMessage);
+            if (!result.IsSuccess())
+                Output.ThrowError("failed to load data for {0}: {1}", info[DataSourceParam.symbolNorgate], result.ErrorMessage);
 
-                //--- copy to TuringTrader bars
-                var bars = new List<BarType<OHLCV>>();
-                //var exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById(info[DataSourceParam.timezone]);
-                //var timeOfDay = DateTime.Parse(info[DataSourceParam.time]).TimeOfDay;
+            //--- copy to TuringTrader bars
+            var bars = new List<BarType<OHLCV>>();
+            //var exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById(info[DataSourceParam.timezone]);
+            //var timeOfDay = DateTime.Parse(info[DataSourceParam.time]).TimeOfDay;
 
-                foreach (var ohlcv in norgateData)
-                {
-                    // Norgate bars only have dates, no time.
-                    // We add the time from the data source descriptor,
-                    // and convert it to the local timezone.
-                    var dateTimeAtExchange = ohlcv.Date.Date + timeOfDay;
-                    var dateTimeLocal = TimeZoneInfo.ConvertTimeToUtc(dateTimeAtExchange, exchangeTimeZone).ToLocalTime();
+            foreach (var ohlcv in norgateData)
+            {
+                // Norgate bars only have dates, no time.
+                // We add the time from the data source descriptor,
+                // and convert it to the local timezone.
+                var dateTimeAtExchange = ohlcv.Date.Date + timeOfDay;
+                var dateTimeLocal = TimeZoneInfo.ConvertTimeToUtc(dateTimeAtExchange, exchangeTimeZone).ToLocalTime();
 
-                    bars.Add(new BarType<OHLCV>(
-                        dateTimeLocal,
-                        new OHLCV(
-                            (double)ohlcv.Open,
-                            (double)ohlcv.High,
-                            (double)ohlcv.Low,
-                            (double)ohlcv.Close,
-                            (double)ohlcv.Volume)));
-                }
-
-                return bars;
+                bars.Add(new BarType<OHLCV>(
+                    dateTimeLocal,
+                    new OHLCV(
+                        (double)ohlcv.Open,
+                        (double)ohlcv.High,
+                        (double)ohlcv.Low,
+                        (double)ohlcv.Close,
+                        (double)ohlcv.Volume)));
             }
+
+            return bars;
         }
 
         private static TimeSeriesAsset.MetaType NorgateLoadMeta(Algorithm owner, Dictionary<DataSourceParam, string> info)
         {
             //var makeSureWeLoadNorgateDll = new NorgateLoaderObject();
 
-            //lock (_lockNorgate)
+            lock (_lockNorgate)
             {
-                var ticker = info[DataSourceParam.symbolNorgate];
-                (var result, var description) = NorgateData.DataAccess.Api.GetSecurityName(ticker);
-                if (!result.IsSuccess())
-                    Output.ThrowError("failed to load meta for {0}: {1}", info[DataSourceParam.symbolNorgate], result.ErrorMessage);
-
-                var meta = new TimeSeriesAsset.MetaType
-                {
-                    Ticker = ticker,
-                    Description = description,
-                };
-
-                return meta;
+                // this will block while inside RunNDU()
             }
+
+            var ticker = info[DataSourceParam.symbolNorgate];
+            (var result, var description) = NorgateData.DataAccess.Api.GetSecurityName(ticker);
+            if (!result.IsSuccess())
+                Output.ThrowError("failed to load meta for {0}: {1}", info[DataSourceParam.symbolNorgate], result.ErrorMessage);
+
+            var meta = new TimeSeriesAsset.MetaType
+            {
+                Ticker = ticker,
+                Description = description,
+            };
+
+            return meta;
         }
 
         private static Tuple<List<BarType<OHLCV>>, TimeSeriesAsset.MetaType> NorgateGetAsset(Algorithm owner, Dictionary<DataSourceParam, string> info)
