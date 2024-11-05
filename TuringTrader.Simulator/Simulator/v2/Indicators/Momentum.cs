@@ -481,7 +481,8 @@ namespace TuringTrader.SimulatorV2.Indicators
 
                     double avgX = windowX.Average();
                     double avgY = windowY.Average();
-                    double sumXx = windowX.Sum(v => v * v);
+                    double sumXx = Enumerable.Range(0, n)
+                        .Sum(i => Math.Pow(windowX[i] - avgX, 2.0));
                     double sumXy = Enumerable.Range(0, n)
                         .Sum(i => (windowX[i] - avgX) * (windowY[i] - avgY));
                     double b = sumXy / Math.Max(1e-99, sumXx);
@@ -501,11 +502,11 @@ namespace TuringTrader.SimulatorV2.Indicators
                     //    = SSreg / SStot
 
                     double totalSumOfSquares = Enumerable.Range(0, n)
-                        .Sum(i => Math.Pow(windowY[i] - avgY, 2));
+                        .Sum(i => Math.Pow(windowY[i] - avgY, 2.0));
                     double regressionSumOfSquares = Enumerable.Range(0, n)
-                        .Sum(i => Math.Pow(a + b * windowX[i] - avgY, 2));
+                        .Sum(i => Math.Pow(a + b * windowX[i] - avgY, 2.0));
                     double residualSumOfSquares = Enumerable.Range(0, n)
-                        .Sum(i => Math.Pow(windowY[i] - a - b * windowX[i], 2));
+                        .Sum(i => Math.Pow(windowY[i] - a - b * windowX[i], 2.0));
 
                     // NOTE: this is debatable. we are returning r2 = 0.0, 
                     //       when it is actually NaN
