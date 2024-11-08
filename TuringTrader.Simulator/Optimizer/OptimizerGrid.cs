@@ -67,24 +67,22 @@ namespace TuringTrader.Optimizer
 
             // create algorithm instance to run
             IAlgorithm instanceToRun = MasterInstance.Clone();
+            var v1Instance = instanceToRun as Algorithm;
+            var v2Instance = instanceToRun as SimulatorV2.Algorithm;
 
             // mark this as an optimizer run
             instanceToRun.IsOptimizing = true;
 
 #if ENABLE_V2_DATA_SHARING
             // use shared data cache (v2 algorithms only)
-            var instanceV2 = (instanceToRun as SimulatorV2.Algorithm);
-            if (instanceV2 != null)
+            if (v2Instance != null)
             {
-                instanceV2.DataCache = _v2DataCache;
+                v2Instance.DataCache = _v2DataCache;
             }
 #endif
 
             // create result entry
             OptimizerResult result = new OptimizerResult();
-            foreach (OptimizerParam parameter in MasterInstance.OptimizerParams.Values)
-                result.Parameters[parameter.Name] = parameter.Value;
-            result.Fitness = null;
             Results.Add(result);
 
             // run algorithm with these values
@@ -92,9 +90,6 @@ namespace TuringTrader.Optimizer
             {
                 try
                 {
-                    var v1Instance = instanceToRun as Algorithm;
-                    var v2Instance = instanceToRun as SimulatorV2.Algorithm;
-
                     if (v1Instance != null)
                     {
                         // make sure to enter the extended Run method
@@ -114,9 +109,22 @@ namespace TuringTrader.Optimizer
                         v2Instance.Run();
                     }
 
+                    // save parameters & results
+                    foreach (OptimizerParam parameter in instanceToRun.OptimizerParams.Values)
+                        result.Parameters[parameter.Name] = parameter.Value;
+
                     result.NetAssetValue = instanceToRun.FitnessReturn;
                     result.MaxDrawdown = instanceToRun.FitnessRisk;
                     result.Fitness = instanceToRun.FitnessValue;
+
+#if false
+                    lock (_optimizerLock)
+                    {
+                        if (_verbose)
+                            Output.WriteLine("{0:C2}: {1}", instanceToRun.FitnessReturn, instanceToRun.OptimizerParamsAsString);
+                    }
+#endif
+
                     instanceToRun = null;
                 }
 
