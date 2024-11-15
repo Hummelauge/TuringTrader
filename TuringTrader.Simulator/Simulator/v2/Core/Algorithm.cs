@@ -328,8 +328,8 @@ namespace TuringTrader.SimulatorV2
             _simLoopOuter(() =>
             {
                 var bar = barFun();
-                Account.ProcessBar();
-                return bar;
+                var nav = Account.ProcessBar();
+                return bar != null ? bar : nav;
             });
         }
 
