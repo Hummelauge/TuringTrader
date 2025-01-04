@@ -42,6 +42,7 @@ namespace TuringTrader.BooksAndPubsV2
         public virtual List<object> BENCHES { get; set; } = null;
         public virtual bool IS_TRADING_DAY => IsFirstBar || SimDate.Month != NextSimDate.Month; // end of month
         public virtual double MGMT_FEE { get; set; } = 0.0;
+        public virtual double CAP_GAINS_TAX { get; set; } = 0.0;
         #endregion
         #region strategy logic
         public override void Run()
@@ -58,8 +59,10 @@ namespace TuringTrader.BooksAndPubsV2
             //========== simulation loop ==========
 
             double accruedFeeDollars = 0.0;
+            double navAtEndOfYear = 1000.00;
             SimLoop(() =>
             {
+                // rebalance allocation
                 if (IS_TRADING_DAY)
                 {
                     foreach (var asset in ALLOCATION)
@@ -68,11 +71,26 @@ namespace TuringTrader.BooksAndPubsV2
                             OrderType.openNextBar);
                 }
 
+                // deduct management fees
                 accruedFeeDollars += NetAssetValue * MGMT_FEE / 252.0;
-                if (SimDate.Month != NextSimDate.Month)
+                if (MGMT_FEE > 0.0 && SimDate.Month != NextSimDate.Month)
                 {
                     ((Account_Default)Account).Deposit(-accruedFeeDollars / NetAssetValue);
                     accruedFeeDollars = 0.0;
+                }
+
+                // deduct capital gains tax
+                if (CAP_GAINS_TAX > 0.0 && SimDate.Year != NextSimDate.Year)
+                {
+                    // this is very crude. We do not distinguish between
+                    // realized and unrealized gains, we do not know about
+                    // long-term vs. short-term gains, and we can't treat
+                    // interest payments and dividends differently.
+                    // Nonetheless, this is a helpful tool.
+                    var gains = NetAssetValue - navAtEndOfYear;
+                    var tax = Math.Max(0.0, gains * CAP_GAINS_TAX);
+                    navAtEndOfYear = NetAssetValue - tax;
+                    ((Account_Default)Account).Deposit(-tax / NetAssetValue);
                 }
 
                 // plotter output
