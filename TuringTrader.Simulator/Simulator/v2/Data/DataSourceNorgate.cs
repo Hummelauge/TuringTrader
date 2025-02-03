@@ -366,7 +366,6 @@ namespace TuringTrader.SimulatorV2
                 //       empty here, leading to incorrect portfolio allocations.
                 //       On 02/03/2025, we changed behavior here, to throw an error
                 //       instead of simply printing a warning.
-                throw new Exception("test!");
                 if (constituents.Count == 0)
                     Output.ThrowError(string.Format("No constituents for universe {0} on {1:MM/dd/yyyy}", _universe, _algorithm.SimDate));
 
