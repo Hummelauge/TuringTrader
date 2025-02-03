@@ -460,6 +460,10 @@ namespace TuringTrader.Simulator
                         }
                     }
 
+                    // NOTE: the v2 engine throws an error here, in case the
+                    //       constituent list is empty. As we have not seen the
+                    //       same issue here, we decided not to add a check for
+                    //       that condition here.
                     var constituents = (NorgateData.DataAccess.SecurityList)_constituents;
                     foreach (var security in constituents)
                     {
