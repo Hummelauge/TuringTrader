@@ -115,7 +115,14 @@ namespace TuringTrader.SimulatorV2
                     }
                 }
 
-                var dateTimeAtExchange = date.Date + timeOfDay;
+                // retired 02/19/2025: conversion to dateTimeLocal failed, because dateTimeAtExchange
+                // had the Kind field set to Local.
+                //var dateTimeAtExchange = date.Date + timeOfDay;
+                // new code 02/19/2025: set the Kind field to Unspecified instead
+                var dateTimeAtExchange = new DateTime(date.Year, date.Month, date.Day,
+                    timeOfDay.Hours, timeOfDay.Minutes, timeOfDay.Seconds, 
+                    DateTimeKind.Unspecified);
+
                 var dateTimeLocal = TimeZoneInfo.ConvertTimeToUtc(dateTimeAtExchange, exchangeTimeZone).ToLocalTime();
 
                 bars.Add(new BarType<OHLCV>(
