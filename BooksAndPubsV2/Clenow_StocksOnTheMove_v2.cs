@@ -172,7 +172,18 @@ namespace TuringTrader.BooksAndPubsV2
                 if (IS_TRADING_DAY)
                 {
                     // we start with the current S&P 500 universe
-                    var constituents = Universe(UNIVERSE);
+                    var constituents = new HashSet<string>();
+                    try
+                    {
+                        constituents = Universe(UNIVERSE);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Universe may throw, if SimDate is before 1990.
+                        // This may happen when using strategy as component
+                        // of a meta-portfolio. When this happens, simply
+                        // leave the constituent list empty.
+                    }
 
                     //----- rank assets
                     //    - by volatility-adjusted momentum
