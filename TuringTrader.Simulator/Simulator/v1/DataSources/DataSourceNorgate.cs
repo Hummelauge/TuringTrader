@@ -275,7 +275,7 @@ namespace TuringTrader.Simulator
                         : default(DateTime);
 #endif
 
-                    if (endTime > dbTimeStamp)
+                    if (endTime > dbTimeStamp && GlobalSettings.NduAutoUpdate)
                         NorgateHelpers.RunNDU();
 
                     //--- get data from Norgate

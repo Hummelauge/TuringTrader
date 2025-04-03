@@ -141,6 +141,11 @@ namespace TuringTrader.Simulator
             get => SimulatorV2.GlobalSettings.QuandlApiKey;
             set => SimulatorV2.GlobalSettings.QuandlApiKey = value;
         }
+        static public bool NduAutoUpdate
+        {
+            get => SimulatorV2.GlobalSettings.NduAutoUpdate;
+            set => SimulatorV2.GlobalSettings.NduAutoUpdate = value;
+        }
 
         #region static public bool AdjustForDividends
         /// <summary>

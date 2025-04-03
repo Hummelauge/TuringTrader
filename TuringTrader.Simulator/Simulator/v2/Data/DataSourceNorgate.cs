@@ -440,7 +440,7 @@ namespace TuringTrader.SimulatorV2
             var dbTimeStamp = TimeZoneInfo.ConvertTimeToUtc(dbLastQuote, exchangeTimeZone).ToLocalTime();
 #endif
 
-            if (endDate > dbTimeStamp)
+            if (endDate > dbTimeStamp && GlobalSettings.NduAutoUpdate)
                 NorgateHelpers.RunNDU();
 
             //--- retrieve data from Norgate

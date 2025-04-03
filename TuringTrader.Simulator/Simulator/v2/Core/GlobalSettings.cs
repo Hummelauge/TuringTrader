@@ -315,6 +315,24 @@ namespace TuringTrader.SimulatorV2
             }
         }
         #endregion
+        #region NduAutoUpdate
+        /// <summary>
+        /// NDU Auto Update
+        /// </summary>
+        static public bool NduAutoUpdate
+        {
+            get
+            {
+                object value = GetRegistryValue("SimulatorEngine", "NduAutoUpdate");
+                if (value == null) return true;
+                return (string)value == "True" ? true : false;
+            }
+            set
+            {
+                SetRegistryValue("SimulatorEngine", "NduAutoUpdate", value);
+            }
+        }
+        #endregion
 
         #region GetRegistryValue
         /// <summary>
