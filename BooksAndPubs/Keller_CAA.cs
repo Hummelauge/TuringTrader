@@ -1,7 +1,7 @@
 ﻿//==============================================================================
 // Project:     TuringTrader, algorithms from books & publications
 // Name:        Keller_CAA
-// Description: Classical Asset Allocation (CAA) strategy, as published in 
+// Description: Classical Symbol Allocation (CAA) strategy, as published in 
 //              Wouter J. Keller, Adam Butler, and Ilya Kipnis' paper 
 //              'Momentum and Markowitz: a Golden Combination'.
 //              https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2606884

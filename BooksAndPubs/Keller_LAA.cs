@@ -1,9 +1,9 @@
 ﻿//==============================================================================
 // Project:     TuringTrader, algorithms from books & publications
 // Name:        Keller_LAA
-// Description: Lethargic Asset Allocation (FAA) strategy, as published in 
+// Description: Lethargic Symbol Allocation (FAA) strategy, as published in 
 //              Wouter J. Keller's paper 
-//              'Growth-Trend Timing and 60-40 Variations: Lethargic Asset Allocation (LAA)'
+//              'Growth-Trend Timing and 60-40 Variations: Lethargic Symbol Allocation (LAA)'
 //              https://ssrn.com/abstract=3498092
 // History:     2020iv28, FUB, created
 //------------------------------------------------------------------------------

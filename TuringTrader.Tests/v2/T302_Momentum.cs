@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TuringTrader.Indicators;
+using TuringTrader.SimulatorV2.Assets;
 using TuringTrader.SimulatorV2.Indicators;
 #endregion
 
@@ -181,6 +182,103 @@ namespace TuringTrader.SimulatorV2.Tests
                 Assert.AreEqual(algo.v1R2[i].Date, algo.v2R2[i].Date);
                 Assert.AreEqual(algo.v1R2[i].Value, algo.v2R2[i].Value, 1e-5);
             }
+        }
+        #endregion
+        #region Regression
+        [TestMethod]
+        public void Test_Regression()
+        {
+            var algo = new T000_Helpers.DoNothing();
+            algo.StartDate = DateTime.Parse("1970-01-01T16:00-05:00");
+            algo.EndDate = DateTime.Parse("2023-03-01");
+            ((Account_Default)algo.Account).Friction = 0.005;
+
+            var asset = algo.Asset(MarketIndex.SPXTR);
+            var anchor = asset.Close.LinRegression(21).Intercept;
+
+            var zAvg = algo.Lambda("z-cone", () =>
+            {
+                var zAvg = 0.0;
+                for (var t = 5; t < 126; t++)
+                {
+                    var vol = asset.Close.Volatility(t)[0];
+                    var std = (Math.Exp(Math.Sqrt(t) * vol) - 1.0) * anchor[0];
+                    var zScore = -(asset.Close[t] - anchor[0]) / Math.Max(1e-99, std);
+                    zAvg += zScore / (5 - 126);
+                }
+                return zAvg;
+            });
+
+            var returns = asset.Close.LogReturn();
+            var regr = returns.Regression(zAvg, 21);// regression seems to return NaN
+            var intercept = regr.Intercept;
+            var slope = regr.Slope;
+            var r2 = regr.R2;
+
+            Assert.AreEqual(13413, intercept.Data.Count);
+            Assert.AreEqual(0.00040183328304084487, intercept.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(-0.018415080718352395, intercept.Data.Min(b => b.Value), 1e-5);
+            Assert.AreEqual(0.010626903962917286, intercept.Data.Max(b => b.Value), 1e-5);
+
+            Assert.AreEqual(13413, slope.Data.Count);
+            Assert.AreEqual(-5.6553006992744286E-89, slope.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(-1.4956037727342638E-87, slope.Data.Min(b => b.Value), 1e-5);
+            Assert.AreEqual(2.591692208161549E-87, slope.Data.Max(b => b.Value), 1e-5);
+
+            Assert.AreEqual(13413, r2.Data.Count);
+            Assert.AreEqual(0.0031645547719399976, r2.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(0.0, r2.Data.Min(b => b.Value), 1e-5);
+            Assert.AreEqual(1.0000000000000018, r2.Data.Max(b => b.Value), 1e-5);
+        }
+
+        [TestMethod]
+        public void Test_Regression2()
+        {
+            var algo = new T000_Helpers.DoNothing();
+            algo.StartDate = DateTime.Parse("1970-01-01T16:00-05:00");
+            algo.EndDate = DateTime.Parse("2023-03-01");
+            ((Account_Default)algo.Account).Friction = 0.005;
+
+            // regression against itself: slope = 1, intercept = 0, r2 = 1
+            var sine1 = algo.Lambda("sine1", () =>
+            {
+                var daysSinceStart = (algo.SimDate - (DateTime)algo.StartDate).TotalDays;
+                return Math.Sin(4.0 * daysSinceStart / 252.0);
+            });
+            var regr1 = sine1.Regression(sine1, 63);
+            Assert.AreEqual(13413, regr1.Slope.Data.Count);
+            Assert.AreEqual(1.0, regr1.Slope.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(0.0, regr1.Intercept.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(1.0, regr1.R2.Data.Average(b => b.Value), 1e-5);
+
+            // regression against 2x self: slope = 2, intercept = 0, r2 = 1
+            var sine2 = sine1.Mul(2.0);
+            var regr2 = sine2.Regression(sine1, 63);
+            Assert.AreEqual(13413, regr2.Slope.Data.Count);
+            Assert.AreEqual(2.0, regr2.Slope.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(0.0, regr2.Intercept.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(1.0, regr2.R2.Data.Average(b => b.Value), 1e-5);
+
+            // regression against 2x self + 2: 
+            var sine3 = sine1.Mul(2.0).Add(2.0);
+            var regr3 = sine3.Regression(sine1, 63);
+            Assert.AreEqual(13413, regr3.Slope.Data.Count);
+            Assert.AreEqual(2.0070081264444943, regr3.Slope.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(2.0003335941986142, regr3.Intercept.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(1.0000931931708044, regr3.R2.Data.Average(b => b.Value), 1e-5);
+
+            // regression against self + other sine + const:
+            var sine4a = algo.Lambda("sine4a", () =>
+            {
+                var daysSinceStart = (algo.SimDate - (DateTime)algo.StartDate).TotalDays;
+                return Math.Sin(16.0 * daysSinceStart / 252.0);
+            });
+            var sine4 = sine1.Add(sine4a.Mul(0.25)).Add(1.0);
+            var regr4 = sine4.Regression(sine1, 63);
+            Assert.AreEqual(13413, regr4.Slope.Data.Count);
+            Assert.AreEqual(0.997560545839355, regr4.Slope.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(0.9905485224831655, regr4.Intercept.Data.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(0.7081069757006984, regr4.R2.Data.Average(b => b.Value), 1e-5);
         }
         #endregion
 

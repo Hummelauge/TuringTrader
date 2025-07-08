@@ -232,6 +232,48 @@ namespace TuringTrader.SimulatorV2.Tests
             }
         }
         #endregion
+        #region VWAP
+        [TestMethod]
+        public void Test_VWAP()
+        {
+            var algo = new T000_Helpers.DoNothing();
+            algo.StartDate = DateTime.Parse("2023-01-01T16:00-05:00");
+            algo.EndDate = DateTime.Parse("2023-12-31T16:00-05:00");
+            algo.WarmupPeriod = TimeSpan.FromDays(90);
+            algo.CooldownPeriod = TimeSpan.FromDays(0);
+
+            var asset = algo.Asset("$SPX");
+            var vwap = asset.VWAP(21).Data
+                .Where(b => b.Date >= algo.StartDate)
+                .ToList();
+
+            Assert.AreEqual(250, vwap.Count);
+            Assert.AreEqual(4247.374150863023, vwap.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(4669.002894940431, vwap.Max(b => b.Value), 1e-5);
+            Assert.AreEqual(3875.20634657336, vwap.Min(b => b.Value), 1e-5);
+        }
+        #endregion
+        #region VWEMA
+        [TestMethod]
+        public void Test_VWEMA()
+        {
+            var algo = new T000_Helpers.DoNothing();
+            algo.StartDate = DateTime.Parse("2023-01-01T16:00-05:00");
+            algo.EndDate = DateTime.Parse("2023-12-31T16:00-05:00");
+            algo.WarmupPeriod = TimeSpan.FromDays(90);
+            algo.CooldownPeriod = TimeSpan.FromDays(0);
+
+            var asset = algo.Asset("$SPX");
+            var vwema = asset.VWEMA(21).Data
+                .Where(b => b.Date >= algo.StartDate)
+                .ToList();
+
+            Assert.AreEqual(250, vwema.Count);
+            Assert.AreEqual(4249.001588211432, vwema.Average(b => b.Value), 1e-5);
+            Assert.AreEqual(4673.872252452, vwema.Max(b => b.Value), 1e-5);
+            Assert.AreEqual(3871.849182989182, vwema.Min(b => b.Value), 1e-5);
+        }
+        #endregion
     }
 }
 

@@ -535,6 +535,44 @@ namespace TuringTrader.SimulatorV2.Indicators
                 });
         }
         #endregion
+        #region Power
+        /// <summary>
+        /// Calculate power of time series.
+        /// </summary>
+        /// <param name="series">input series</param>
+        /// <param name="power"></param>
+        /// <returns>exp time series</returns>
+        public static TimeSeriesFloat Pow(this TimeSeriesFloat series, double power)
+        {
+            var name = string.Format("{0}.Pow({1})", series.Name, power);
+
+            return series.Owner.ObjectCache.Fetch(
+                name,
+                () =>
+                {
+                    var data = series.Owner.DataCache.Fetch(
+                        name,
+                        () => Task.Run(() =>
+                        {
+                            var src = series.Data;
+                            var dst = new List<BarType<double>>();
+
+                            foreach (var it in src)
+                            {
+                                dst.Add(new BarType<double>(
+                                    it.Date,
+                                    Math.Pow(it.Value, power)));
+                            }
+
+                            return dst;
+                        }));
+
+                    return new TimeSeriesFloat(series.Owner, name, data);
+                });
+        }
+
+        // TODO: public static TimeSeriesFloat Pow(this TimeSeriesFloat series, TimeSeriesFloat powerSeries)
+        #endregion
     }
 }
 

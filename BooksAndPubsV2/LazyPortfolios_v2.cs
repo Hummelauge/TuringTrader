@@ -39,7 +39,10 @@ namespace TuringTrader.BooksAndPubsV2
         #region inputs
         public virtual HashSet<Tuple<object, double>> ALLOCATION { get; set; }
         public virtual object BENCH { get; set; } = Benchmark.PORTFOLIO_60_40;
-        public virtual bool IsTradingDay => IsFirstBar || SimDate.Month != NextSimDate.Month; // end of month
+        public virtual List<object> BENCHES { get; set; } = null;
+        public virtual bool IS_TRADING_DAY => IsFirstBar || SimDate.Month != NextSimDate.Month; // end of month
+        public virtual double MGMT_FEE { get; set; } = 0.0;
+        public virtual double CAP_GAINS_TAX { get; set; } = 0.0;
         #endregion
         #region strategy logic
         public override void Run()
@@ -55,14 +58,39 @@ namespace TuringTrader.BooksAndPubsV2
 
             //========== simulation loop ==========
 
+            double accruedFeeDollars = 0.0;
+            double navAtEndOfYear = 1000.00;
             SimLoop(() =>
             {
-                if (IsTradingDay)
+                // rebalance allocation
+                if (IS_TRADING_DAY)
                 {
                     foreach (var asset in ALLOCATION)
                         Asset(asset.Item1).Allocate(
                             autoAlloc ? 1.0 / ALLOCATION.Count : asset.Item2,
                             OrderType.openNextBar);
+                }
+
+                // deduct management fees
+                accruedFeeDollars += NetAssetValue * MGMT_FEE / 252.0;
+                if (MGMT_FEE > 0.0 && SimDate.Month != NextSimDate.Month)
+                {
+                    ((Account_Default)Account).Deposit(-accruedFeeDollars / NetAssetValue);
+                    accruedFeeDollars = 0.0;
+                }
+
+                // deduct capital gains tax
+                if (CAP_GAINS_TAX > 0.0 && SimDate.Year != NextSimDate.Year)
+                {
+                    // this is very crude. We do not distinguish between
+                    // realized and unrealized gains, we do not know about
+                    // long-term vs. short-term gains, and we can't treat
+                    // interest payments and dividends differently.
+                    // Nonetheless, this is a helpful tool.
+                    var gains = NetAssetValue - navAtEndOfYear;
+                    var tax = Math.Max(0.0, gains * CAP_GAINS_TAX);
+                    navAtEndOfYear = NetAssetValue - tax;
+                    ((Account_Default)Account).Deposit(-tax / NetAssetValue);
                 }
 
                 // plotter output
@@ -71,7 +99,19 @@ namespace TuringTrader.BooksAndPubsV2
                     Plotter.SelectChart(Name, "Date");
                     Plotter.SetX(SimDate);
                     Plotter.Plot(Name, NetAssetValue);
-                    Plotter.Plot(Asset(BENCH).Description, Asset(BENCH).Close[0]);
+                    if (BENCHES == null)
+                        Plotter.Plot(Asset(BENCH).Description, Asset(BENCH).Close[0]);
+                    else
+                        foreach (var bench in BENCHES)
+                            Plotter.Plot(Asset(bench).Description, Asset(bench).Close[0]);
+
+                    Plotter.SelectChart("Symbol 12-Months Rolling Returns", "Date");
+                    Plotter.SetX(SimDate);
+                    foreach (var alloc in ALLOCATION)
+                    {
+                        var asset = Asset(alloc.Item1);
+                        Plotter.Plot(asset.Description, 100.0 * (asset.Close[0] / asset.Close[252] - 1.0));
+                    }
                 }
             });
 

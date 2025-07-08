@@ -1,10 +1,10 @@
 ﻿//==============================================================================
 // Project:     TuringTrader, algorithms from books & publications
 // Name:        Keller_BAA_v2
-// Description: Bold Asset Allocation (BAA) strategy, as published in 
+// Description: Bold Symbol Allocation (BAA) strategy, as published in 
 //              Wouter J. Keller's paper 
 //              'Relative and Absolute Momentum in Times of Rising/Low Yields:
-//              Bold Asset Allocation (BAA)'
+//              Bold Symbol Allocation (BAA)'
 //              https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4166845
 // History:     2022xi21, FUB, created
 //------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region BAA Core
     public abstract class Keller_BAA_Core : Algorithm
     {
-        public override string Name => "Keller's Bold Asset Allocation (BAA)";
+        public override string Name => "Keller's Bold Symbol Allocation (BAA)";
 
         #region configuration
         //--- offensive configuration
@@ -259,7 +259,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region BAA-G12 (balanced)
     public class Keller_BAA_G12 : Keller_BAA_Core
     {
-        public override string Name => "Keller's Bold Asset Allocation (BAA-G12)";
+        public override string Name => "Keller's Bold Symbol Allocation (BAA-G12)";
         public override List<string> SEL_O { get; set; } = new List<string>
         {
             ETF.SPY,
@@ -281,7 +281,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region BAA-G4 (aggressive)
     public class Keller_BAA_G4 : Keller_BAA_Core
     {
-        public override string Name => "Keller's Bold Asset Allocation (BAA-G4)";
+        public override string Name => "Keller's Bold Symbol Allocation (BAA-G4)";
         public override List<string> SEL_O { get; set; } = new List<string>
         {
             ETF.QQQ,
@@ -297,21 +297,21 @@ namespace TuringTrader.BooksAndPubsV2
     #region BAA-G12/T3 (less diversified balanced)
     public class Keller_BAA_G12T3 : Keller_BAA_G12
     {
-        public override string Name => "Keller's Bold Asset Allocation (BAA-G12/T3)";
+        public override string Name => "Keller's Bold Symbol Allocation (BAA-G12/T3)";
         public override int TO => 3;
     }
     #endregion
     #region BAA-G4/T2 (less concentrated aggressive)
     public class Keller_BAA_G4T2 : Keller_BAA_G4
     {
-        public override string Name => "Keller's Bold Asset Allocation (BAA-G4/T2)";
+        public override string Name => "Keller's Bold Symbol Allocation (BAA-G4/T2)";
         public override int TO => 2;
     }
     #endregion
     #region BAA-SPY (max simplicity)
     public class Keller_BAA_SPY : Keller_BAA_Core
     {
-        public override string Name => "Keller's Bold Asset Allocation (BAA-SPY)";
+        public override string Name => "Keller's Bold Symbol Allocation (BAA-SPY)";
         public override List<string> SEL_O { get; set; } = new List<string>
         {
             ETF.SPY,

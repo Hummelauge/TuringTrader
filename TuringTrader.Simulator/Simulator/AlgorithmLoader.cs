@@ -94,7 +94,7 @@ namespace TuringTrader.Simulator
             {
                 types = assembly.GetTypes();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // can't load types: ignore
                 // NOTE: no error message here, as we might look at many DLLs

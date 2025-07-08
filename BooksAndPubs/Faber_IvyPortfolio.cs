@@ -3,7 +3,7 @@
 // Name:        Faber_IvyPortfolio
 // Description: Variuous strategies as published in Mebane Faber's book
 //              'The Ivy Portfolio' and
-//              'A Quantitative Approach to Tactical Asset Allocation'
+//              'A Quantitative Approach to Tactical Symbol Allocation'
 //              https://papers.ssrn.com/sol3/papers.cfm?abstract_id=962461
 //              'Relative Strength Strategies for Investing'
 //              https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1585517
@@ -494,7 +494,7 @@ namespace TuringTrader.BooksAndPubs
 
                     foreach (var ds in assets)
                     {
-                        _plotter.SelectChart("Asset " + ds.Instrument.Symbol, "Date");
+                        _plotter.SelectChart("Symbol " + ds.Instrument.Symbol, "Date");
                         _plotter.SetX(SimTime[0]);
                         _plotter.Plot(ds.Instrument.Symbol, ds.Instrument.Close[0]);
                         _plotter.Plot("3-months SMA", indicators[ds].mom3mo[0]);

@@ -55,8 +55,8 @@ namespace TuringTrader.SimulatorV2
                         DateTime.Parse("01/01/1950", CultureInfo.InvariantCulture),
                         DateTime.Now + TimeSpan.FromDays(5));
 
-                    using (var client = new HttpClient())
-                        return client.GetStringAsync(url).Result;
+                        using (var client = new HttpClient())
+                            return client.GetStringAsync(url).Result;
                 },
                 (stringData) =>
                 {   // parse data and check validity

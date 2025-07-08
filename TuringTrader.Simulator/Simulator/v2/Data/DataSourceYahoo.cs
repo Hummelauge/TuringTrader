@@ -35,24 +35,57 @@ namespace TuringTrader.SimulatorV2
         private static readonly DateTime _yahooEpochOrigin = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         private static long _yahooToUnixTime(DateTime timestamp) => Convert.ToInt64((timestamp - _yahooEpochOrigin).TotalSeconds);
         private static DateTime _yahooFromUnixTime(long unixTime) => _yahooEpochOrigin.AddSeconds(unixTime);
+        private static string _yahooConvertTicker(string ticker) => ticker.Replace('.', '-');
+        private static HttpClient __httpClient = null;
+        private static object __httpClientLock = new object();
+        private static HttpClient _httpClient
+        {
+            get
+            {
+                lock (__httpClientLock)
+                {
+                    __httpClient = new HttpClient();
+                    //__httpClient.BaseAddress = new Uri("https://query1.finance.yahoo.com/v8/finance/chart");
+                    __httpClient.DefaultRequestHeaders.Add("accept", "application/json");
+                    //__httpClient.DefaultRequestHeaders.Add("accept", "*/*");
+                    __httpClient.DefaultRequestHeaders.Add("Accept-encoding", "gzip,deflate,br,zstd");
+                    __httpClient.DefaultRequestHeaders.Add("cache-control", "no-cache");
+                    __httpClient.DefaultRequestHeaders.Add("referer", "https://finance.yahoo.com/chart/%5EGSPC");
+                    __httpClient.DefaultRequestHeaders.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0");
+
+                    return __httpClient;
+                }
+            }
+        }
         #endregion
         private static List<BarType<OHLCV>> YahooLoadData(Algorithm algo, Dictionary<DataSourceParam, string> info) =>
             _loadDataHelper<JObject>(
                 algo, info,
                 () =>
-                {   // retrieve data from Yahoo
-                    string url = string.Format(
+                {
+                    // retrieve data from Yahoo
+                    var url = string.Format(
                         @"http://query1.finance.yahoo.com/v8/finance/chart/"
                         + "{0}"
                         + "?interval=1d"
                         + "&period1={1}"
                         + "&period2={2}",
-                        info[DataSourceParam.symbolYahoo],
+                        _yahooConvertTicker(info[DataSourceParam.symbolYahoo]),
                         0, // epoch origin 01/01/1970
                         _yahooToUnixTime(DateTime.Now + TimeSpan.FromDays(5)));
 
+#if true
+                    // new as of 07/30/2024
+                    // it seems that setting the request headers and sharing the client
+                    // does the trick for now
+                    using (var client = _httpClient)
+                        return client.GetStringAsync(url).Result;
+
+#else
+                    // broken as of 06/2024. Returns 429, too many requests
                     using (var client = new HttpClient())
                         return client.GetStringAsync(url).Result;
+#endif
                 },
                 (stringData) =>
                 {   // parse data and check validity
@@ -145,7 +178,7 @@ namespace TuringTrader.SimulatorV2
                     string url = string.Format(
                         @"http://finance.yahoo.com/quote/"
                         + "{0}",
-                        info[DataSourceParam.symbolYahoo]);
+                        _yahooConvertTicker(info[DataSourceParam.symbolYahoo]));
 
                     using (var client = new HttpClient())
                         return client.GetStringAsync(url).Result;

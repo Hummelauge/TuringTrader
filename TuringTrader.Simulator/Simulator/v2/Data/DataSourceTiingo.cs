@@ -21,6 +21,7 @@
 //              https://www.gnu.org/licenses/agpl-3.0.
 //==============================================================================
 
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -39,7 +40,14 @@ namespace TuringTrader.SimulatorV2
             _loadDataHelper<JArray>(
                 algo, info,
                 () =>
-                {   // retrieve data from Yahoo
+                {   // retrieve data from Tiingo
+#if EXTENSION
+                    Output.WriteInfo("DataSource Tiingo: retrieving data from web for {0}", info[DataSourceParam.nickName]);
+                    var tiingoDataPointsService = algo.serviceProvider.GetRequiredService<ServiceTiingoTicker>();
+                    var jsonTask = tiingoDataPointsService.GetTiingoData(info[DataSourceParam.symbolTiingo]);
+                    return jsonTask.Result;
+
+#else
                     string url = string.Format(
                         "https://api.tiingo.com/tiingo/daily/{0}/prices"
                         + "?startDate={1:yyyy}-{1:MM}-{1:dd}"
@@ -54,6 +62,7 @@ namespace TuringTrader.SimulatorV2
 
                     using (var client = new HttpClient())
                         return client.GetStringAsync(url).Result;
+#endif
                 },
                 (raw) =>
                 {   // parse data and check validity

@@ -129,21 +129,21 @@ namespace TuringTrader.BooksAndPubs
 
                         _plotter.SelectChart("Momentum Comparison", "Date");
                         _plotter.SetX(SimTime[0]);
-                        _plotter.Plot("Asset A Selected", ranked[0] == assetA ? 0.125 : 0.0);
+                        _plotter.Plot("Symbol A Selected", ranked[0] == assetA ? 0.125 : 0.0);
                         for (int i = 0; i < PERIODS.Count(); i++)
                         {
-                            //_plotter.Plot(string.Format("Asset A: {0}d", PERIODS[i]), roc[assetA][PERIODS[i]] + 0.25 * i + 0.25);
-                            //_plotter.Plot(string.Format("Asset B: {0}d", PERIODS[i]), roc[assetB][PERIODS[i]] + 0.25 * i + 0.25);
-                            _plotter.Plot(string.Format("Asset A - Asset B: {0}d", PERIODS[i]), (roc[assetA][PERIODS[i]] - roc[assetB][PERIODS[i]]) + 0.25 * i + 0.25);
+                            //_plotter.Plot(string.Format("Symbol A: {0}d", PERIODS[i]), roc[assetA][PERIODS[i]] + 0.25 * i + 0.25);
+                            //_plotter.Plot(string.Format("Symbol B: {0}d", PERIODS[i]), roc[assetB][PERIODS[i]] + 0.25 * i + 0.25);
+                            _plotter.Plot(string.Format("Symbol A - Symbol B: {0}d", PERIODS[i]), (roc[assetA][PERIODS[i]] - roc[assetB][PERIODS[i]]) + 0.25 * i + 0.25);
                             _plotter.Plot(string.Format("Trigger Line: {0}d", PERIODS[i]), 0.25 * i + 0.25);
                         }
 
                         _plotter.SelectChart("Internal Scores", "Date");
                         _plotter.SetX(SimTime[0]);
-                        _plotter.Plot("Asset A: " + assetA.Instrument.Name, 0.1 * assetA.Instrument.Close[0]);
-                        _plotter.Plot("Asset B: " + assetB.Instrument.Name, 0.1 * assetB.Instrument.Close[0]);
-                        _plotter.Plot("Asset A Score", score[assetA]);
-                        _plotter.Plot("Asset B Score", PERIODS.Count() - score[assetA]);
+                        _plotter.Plot("Symbol A: " + assetA.Instrument.Name, 0.1 * assetA.Instrument.Close[0]);
+                        _plotter.Plot("Symbol B: " + assetB.Instrument.Name, 0.1 * assetB.Instrument.Close[0]);
+                        _plotter.Plot("Symbol A Score", score[assetA]);
+                        _plotter.Plot("Symbol B Score", PERIODS.Count() - score[assetA]);
                     }
                 }
 

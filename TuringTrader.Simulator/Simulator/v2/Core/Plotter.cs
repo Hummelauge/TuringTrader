@@ -51,6 +51,9 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public void AddTradeLog()
         {
+            if (Algorithm.Account.TradeLog.Count == 0)
+                return;
+
             // TODO: rewrite to support RESOLVE_CHILD_HOLDINGS???
             SelectChart("Trade Log", "submitted");
             foreach (var trade in Algorithm.Account.TradeLog)
@@ -76,10 +79,16 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public void AddTargetAllocation()
         {
+            if (Algorithm.Positions.Count == 0)
+                return;
+
             var holdings = new Dictionary<string, double>();
             var names = new Dictionary<string, string>();
             var prices = new Dictionary<string, double>();
 
+            // NOTE: the v2 wrapper for v1 child algorithms doesn't advance SimDate.
+            //       As a workaround, we get lastSimDate from the top-level v2 algorithm.
+            var lastSimDate = Algorithm.SimDate;
             var lastRebalanceDate = Algorithm.Account.TradeLog.Last().OrderTicket.SubmitDate;
 
             void addAssetAllocation(Algorithm algo, double scale = 1.0)
@@ -106,7 +115,7 @@ namespace TuringTrader.SimulatorV2
                         {
                             holdings[ticker] = 0.0;
                             names[ticker] = asset.Description;
-                            prices[ticker] = asset.Close[0];
+                            prices[ticker] = asset.Close[lastSimDate];
                         }
 
                         holdings[ticker] += kv.Value * scale;
@@ -124,7 +133,6 @@ namespace TuringTrader.SimulatorV2
                 Plot("Price", string.Format("{0:C2}", prices[ticker]));
             }
 
-            // BUGBUG: this is incorrect as it does not consider the child strategies
             SelectChart(Simulator.Plotter.SheetNames.LAST_REBALANCE, "Key");
             SetX("LastRebalance");
             Plot("Value", lastRebalanceDate);
@@ -137,6 +145,9 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public void AddHistoricalAllocations()
         {
+            if (Algorithm.Account.TradeLog.Count == 0)
+                return;
+
             var allEodAllocations = new Dictionary<Algorithm, List<Tuple<DateTime, Dictionary<string, double>>>>();
             var allTradeDates = new HashSet<DateTime>();
 
@@ -153,9 +164,9 @@ namespace TuringTrader.SimulatorV2
                     // BUGBUG: this is inaccurate. Due to the fluctuation
                     //         of asset prices, the new line has deviated
                     //         from the previous allocation.
-                    //         However, because typically all assets weights
-                    //         are adjusted simultaneously, this shouldn't
-                    //         matter too much.
+                    //         However, because a typical strategy adjusts
+                    //         all its assets weights simultaneously, this
+                    //         shouldn't matter too much.
                     if (eodAllocation.Count == 0)
                         eodAllocation.Add(Tuple.Create(
                             trade.OrderTicket.SubmitDate,
@@ -313,6 +324,22 @@ namespace TuringTrader.SimulatorV2
 #endif
         }
     }
+#if EXTENSION
+    /// <summary>
+    /// Class for candle stick items
+    /// </summary>
+    public class CandleStickItem
+    {
+        public DateTime XDateTime { get; set; }
+        public double O { get; set; }
+        public double H { get; set; }
+        public double L { get; set; }
+        public double C { get; set; }
+        public double V { get; set; }
+        public string Entry { get; set; }
+        public string Cover { get; set; }
+    }
+#endif
 }
 
 //==============================================================================

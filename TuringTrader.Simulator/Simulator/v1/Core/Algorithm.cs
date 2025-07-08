@@ -93,6 +93,15 @@ namespace TuringTrader.Simulator
         /// </summary>
         public bool IsDataSource { get; set; } = false;
         #endregion
+        #region public bool IsRunningInsideV2
+        /// <summary>
+        /// Field indicating if this algorithm instance is running
+        /// inside a V2 engine host. This information is required
+        /// to tweak some of the memory cleanup at the end of the
+        /// simulation.
+        /// </summary>
+        public bool IsRunningInsideV2 { get; set; } = false;
+        #endregion
 
         #region public virtual void Run()
         /// <summary>

@@ -26,6 +26,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 
 namespace TuringTrader.SimulatorV2
 {
@@ -34,6 +35,11 @@ namespace TuringTrader.SimulatorV2
     /// </summary>
     public class TradingCalendar_US : ITradingCalendar
     {
+        #region internal stuff
+        private readonly Algorithm _algorithm = null;
+        private DateTime? _startDate = null;
+        private DateTime? _endDate = null;
+
         #region holiday list
         // NOTE: this is a rather disappointing solution. however, 
         // it is good enough to keep us going for the next 2 years
@@ -944,7 +950,7 @@ namespace TuringTrader.SimulatorV2
 #endif
         };
         #endregion
-        #region internal helpers
+        #region helpers
         //private readonly DateTime _earliestTime = new DateTime(1990, 1, 1, 0, 1, 0, DateTimeKind.Utc);
         private readonly DateTime _earliestTime = new DateTime(1950, 1, 1, 0, 1, 0, DateTimeKind.Utc);
 
@@ -959,7 +965,12 @@ namespace TuringTrader.SimulatorV2
             || exchangeDateTime.DayOfWeek == DayOfWeek.Sunday)
                 return true;
 
+#if EXTENSION
+            // holidays need to be stored in the list in ascending order for this to work...
+            if (_holidays.BinarySearch(exchangeDateTime.Date) > -1)
+#else
             if (_holidays.Contains(exchangeDateTime.Date))
+#endif
                 return true;
 
             return false;
@@ -987,11 +998,33 @@ namespace TuringTrader.SimulatorV2
             return localAtClose;
         }
         #endregion
+        #endregion
 
-        public TimeZoneInfo ExchangeTimeZone => TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); // New York, USA
+        public TradingCalendar_US(Algorithm algorithm = null)
+        {
+            _algorithm = algorithm;
+        }
+
+#if EXTENSION
+        private TimeZoneInfo _exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); // New York, USA
+        public TimeOnly _timeOfClose = TimeOnly.Parse("16:00"); // NYSE closes at 4pm
+
+        public TimeZoneInfo ExchangeTimeZone => _exchangeTimeZone;
+        public TimeOnly TimeOfClose => _timeOfClose;
+#else
+        public TimeZoneInfo ExchangeTimeZone => TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");  // New York, USA
         public TimeOnly TimeOfClose => TimeOnly.Parse("16:00"); // NYSE closes at 4pm
-        public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; }
+#endif
+        public DateTime StartDate
+        {
+            get => (DateTime)(_algorithm != null ? _algorithm.StartDate - _algorithm.WarmupPeriod : _startDate);
+            set => _startDate = value;
+        }
+        public DateTime EndDate
+        {
+            get => (DateTime)(_algorithm != null ? _algorithm.EndDate + _algorithm.CooldownPeriod : _endDate);
+            set => _endDate = value;
+        }
 
         public List<DateTime> TradingDays
         {

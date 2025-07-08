@@ -54,7 +54,7 @@ namespace TuringTrader.SimulatorV2
             Date = date;
             Value = value;
         }
-    }
+    } 
     #endregion
     #region class TimeSeries<T>
     /// <summary>
@@ -254,6 +254,16 @@ namespace TuringTrader.SimulatorV2
         }
 
         /// <summary>
+        /// Retrieve last n values.
+        /// </summary>
+        /// <param name="n"></param>
+        /// <returns>List of values</returns>
+        public List<T> Take(int n)
+            => Enumerable.Range(0, n)
+                .Select(t => this[t])
+                .ToList();
+
+        /// <summary>
         /// Helper class to allow retrieval of the series' timestamp at an
         /// offset relative to the parent algorithm's simulator timestamp.
         /// </summary>
@@ -385,7 +395,7 @@ namespace TuringTrader.SimulatorV2
         /// Create new time series for an asset.
         /// </summary>
         /// <param name="owner">Algorithm instance requesting/ owning this time series</param>
-        /// <param name="name">Asset's nickname</param>
+        /// <param name="name">Symbol's nickname</param>
         /// <param name="retrieve">data retrieval task</param>
         /// <param name="extractBars">extractor for time series bars</param>
         /// <param name="extractMeta">extractor for meta information</param>
@@ -400,16 +410,34 @@ namespace TuringTrader.SimulatorV2
         }
 
         /// <summary>
+        /// Create new time series for an asset.
+        /// </summary>
+        /// <param name="owner"></param>
+        /// <param name="name"></param>
+        /// <param name="data">data for time series</param>
+        public TimeSeriesAsset(
+            Algorithm owner, string name,
+            List<BarType<OHLCV>> data)
+            : base(owner, name, data)
+        { }
+
+        /// <summary>
         /// Container class to store meta data for TimeSeriesAsset.
         /// </summary>
         public class MetaType
         {
             /// <summary>
-            /// Asset's ticker symbol. 
+            /// Symbol's ticker symbol. 
             /// </summary>
             public string Ticker;
+#if EXTENSION
             /// <summary>
-            /// Asset's full descriptive name.
+            /// Symbol's underlying ticker symbol. 
+            /// </summary>
+            public string UnderlyingTicker;
+#endif
+            /// <summary>
+            /// Symbol's full descriptive name.
             /// </summary>
             public string Description;
             /// <summary>
@@ -419,7 +447,7 @@ namespace TuringTrader.SimulatorV2
         }
 
         /// <summary>
-        /// Asset's meta data including its ticker symbol and descriptive name.
+        /// Symbol's meta data including its ticker symbol and descriptive name.
         /// </summary>
         public MetaType Meta => _extractMeta(_retrieveUntyped.Result);
 
@@ -433,6 +461,12 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public string Ticker => Meta.Ticker;
 
+#if EXTENSION
+        /// <summary>
+        /// Convenience function to return asset's underlying ticker symbol. (for options)
+        /// </summary>
+        public string UnderlyingTicker => Meta.UnderlyingTicker;
+#endif
         /// <summary>
         /// Return time series of opening prices.
         /// </summary>
@@ -460,10 +494,23 @@ namespace TuringTrader.SimulatorV2
         /// <param name="weight"></param>
         /// <param name="orderType"></param>
         /// <param name="orderPrice"></param>
+#if EXTENSION
+        /// <param name="comment"></param>
+        public void Allocate(double weight, OrderType orderType, double orderPrice = 0.0, string comment = "")
+        {
+            // NOTE: trades can only be executed within the given sim range
+            if (Owner.SimDate >= Owner.StartDate && Owner.SimDate <= Owner.EndDate)
+                Owner.Account.SubmitOrder(Name, weight, orderType, orderPrice, comment);
+        }
+#else
         public void Allocate(double weight, OrderType orderType, double orderPrice = 0.0)
         {
-            Owner.Account.SubmitOrder(Name, weight, orderType, orderPrice);
+            // NOTE: trades can only be executed within the given sim range
+            if (Owner.SimDate >= Owner.StartDate && Owner.SimDate <= Owner.EndDate)
+                Owner.Account.SubmitOrder(Name, weight, orderType, orderPrice);
         }
+#endif
+
 
         /// <summary>
         /// Return position as fraction of account's NAV.

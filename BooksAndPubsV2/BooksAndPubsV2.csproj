@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0-windows</TargetFramework>
+    <TargetFramework>net9.0-windows10.0.19041.0</TargetFramework>
     <Authors>Felix Bertram et al</Authors>
     <Company>Bertram Enterprises LLC dba TuringTrader.com</Company>
     <Product>TuringTrader</Product>
@@ -25,12 +25,12 @@
   </PropertyGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="copy $(TargetPath) ..\Algorithms\$(TargetFileName)" />
+    <Exec Command="copy &quot;$(TargetPath)&quot; C:\Users\Internet\Documents\TuringTrader\Algorithms\BooksAndPubsV2.dll&#xD;&#xA;copy $(TargetPath) ..\Algorithms\$(TargetFileName)" />
   </Target>
 
   <ItemGroup>
     <Reference Include="TuringTrader.Simulator">
-      <HintPath>C:\Program Files\TuringTrader\Bin\TuringTrader.Simulator.dll</HintPath>
+      <HintPath>..\TuringTrader.Simulator\bin\x64\Debug\net9.0-windows10.0.19041.0\TuringTrader.Simulator.dll</HintPath>
     </Reference>
   </ItemGroup>
 

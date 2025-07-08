@@ -91,7 +91,7 @@ namespace TuringTrader.Simulator
         public LogEntryInstrument InstrumentType;
 
         /// <summary>
-        /// Asset's percentage of NAV after the order is executed.
+        /// Symbol's percentage of NAV after the order is executed.
         /// This value is only an estimate and serves the sole purpose 
         /// of allowing use of v1 algorithms in v2 hosts.
         /// </summary>

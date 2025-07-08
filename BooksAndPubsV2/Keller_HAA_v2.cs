@@ -1,10 +1,10 @@
 ﻿//==============================================================================
 // Project:     TuringTrader, algorithms from books & publications
 // Name:        Keller_HAA_v2
-// Description: Bold Asset Allocation (BAA) strategy, as published in 
+// Description: Bold Symbol Allocation (BAA) strategy, as published in 
 //              Wouter J. Keller's  and Jan Willem Keyning's paper 
 //              'Dual and Canary Momentum with Rising Yields/Inflation:
-//              Hybrid Asset Allocation (HAA)'
+//              Hybrid Symbol Allocation (HAA)'
 //              https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4346906
 // History:     2023iii06, FUB, created
 //------------------------------------------------------------------------------
@@ -240,7 +240,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region HAA-Balanced
     public class Keller_HAA_Balanced : Keller_HAA_Core
     {
-        public override string Name => "Keller's Hybrid Asset Allocation (HAA-Balanced)";
+        public override string Name => "Keller's Hybrid Symbol Allocation (HAA-Balanced)";
 
         public override List<string> SEL_O { get; set; } = new List<string>
         {
@@ -256,7 +256,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region HAA-16
     /*public class Keller_HAA_16 : Keller_HAA_Core
     {
-        public override string Name => "Keller's Hybrid Asset Allocation (HAA-16)";
+        public override string Name => "Keller's Hybrid Symbol Allocation (HAA-16)";
 
         public override List<string> SEL_O { get; set; } = new List<string>
         {
@@ -270,7 +270,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region HAA-12
     public class Keller_HAA_12 : Keller_HAA_Core
     {
-        public override string Name => "Keller's Hybrid Asset Allocation (HAA-12)";
+        public override string Name => "Keller's Hybrid Symbol Allocation (HAA-12)";
 
         public override List<string> SEL_O { get; set; } = new List<string>
         {
@@ -284,7 +284,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region HAA-4
     public class Keller_HAA_4 : Keller_HAA_Core
     {
-        public override string Name => "Keller's Hybrid Asset Allocation (HAA-4)";
+        public override string Name => "Keller's Hybrid Symbol Allocation (HAA-4)";
 
         public override List<string> SEL_O { get; set; } = new List<string>
         {
@@ -298,7 +298,7 @@ namespace TuringTrader.BooksAndPubsV2
     #region HAA-Simple
     public class Keller_HAA_Simple : Keller_HAA_Core
     {
-        public override string Name => "Keller's Hybrid Asset Allocation (HAA-Simple)";
+        public override string Name => "Keller's Hybrid Symbol Allocation (HAA-Simple)";
 
         public override List<string> SEL_O { get; set; } = new List<string>
         {

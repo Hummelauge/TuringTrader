@@ -3,7 +3,7 @@
 // Name:        Keller_DAA
 // Description: Strategy, as published in Wouter J. Keller and Jan Willem Keuning's
 //              paper 'Breadth Momentum and the Canary Universe:
-//              Defensive Asset Allocation (DAA)'
+//              Defensive Symbol Allocation (DAA)'
 //              https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3212862
 // History:     2019ii18, FUB, created
 //------------------------------------------------------------------------------

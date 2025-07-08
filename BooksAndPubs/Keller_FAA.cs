@@ -1,9 +1,9 @@
 ﻿//==============================================================================
 // Project:     TuringTrader, algorithms from books & publications
 // Name:        Keller_FAA
-// Description: Flexible Asset Allocation (FAA) strategy, as published in 
+// Description: Flexible Symbol Allocation (FAA) strategy, as published in 
 //              Wouter J. Keller, and Hugo S. van Putten's paper 
-//              'Generalized Momentum and Flexible Asset Allocation (FAA)'
+//              'Generalized Momentum and Flexible Symbol Allocation (FAA)'
 //              https://ssrn.com/abstract=2193735
 // History:     2020iv24, FUB, created
 //------------------------------------------------------------------------------

@@ -633,8 +633,31 @@ namespace TuringTrader.Simulator
                 //----- attempt to free up resources
                 _dataSources.Clear();
                 _instruments.Clear();
+#if false
+                // retired 2024viiii11
+                // BUGBUG: when running a hierarchy of v1 algos inside a v2 host,
+                //         we need to query Positions on algo instance. Clearing
+                //         Positions here will lead to no positions on the last bar.
                 Positions.Clear();
-                PendingOrders.Clear();
+#else
+                // introduced 2024viiii11
+                var algo = this as Algorithm;
+                if (algo == null || !algo.IsDataSource || !algo.IsRunningInsideV2)
+                {
+                    // this is the default behavior
+                    Positions.Clear();
+                    PendingOrders.Clear();
+                }
+                else
+                {
+                    // new behavior: keep Positions alive, when
+                    // running as DataSource inside V2 engine
+                    // BUGBUG: note that this may consume significant memory
+
+                    // new behavior 2024viiii20: keep pending orders alive,
+                    // when running as DataSource inside v2 engine
+                }
+#endif
                 SimTime.Clear();
 
                 yield break;

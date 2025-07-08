@@ -21,7 +21,13 @@
 //              https://www.gnu.org/licenses/agpl-3.0.
 //==============================================================================
 
-#region libraries
+//******************************************************************************
+// * * *   T O D O
+// * * *   this template is messy and urgently needs an
+// * * *   overhaul using the v2 engine's features.
+//******************************************************************************
+
+#region libraries 
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Legends;
@@ -40,7 +46,7 @@ namespace TuringTrader
     /// </summary>
     public abstract class _ReportTemplate
     {
-        #region chart configuration
+        #region chart configuration  
         /// <summary>
         /// Configure report type. If this property is set to false,
         /// every plotter chart will result in one sheet (table, chart,
@@ -53,12 +59,23 @@ namespace TuringTrader
         /// Configure vertical axis. If this property is set to true,
         /// the charts scale the vertical axis logarithmically.
         /// </summary>
+#if EXTENSION
+        protected virtual bool CFG_IS_LOG => true;
+#else
         protected virtual bool CFG_IS_LOG => false;
+#endif
         /// <summary>
         /// Configure chart legend. If this property is set to false,
         /// the chart will not have a legend.
         /// </summary>
         protected virtual bool CFG_HAS_LEGEND => true;
+        /// <summary>
+        /// Configure tracking chart. If this property is set to true,
+        /// the chart will calculate all tracking graphs against the
+        /// last series as the benchmark. Otherwise, it will chart
+        /// the first series against all others as benchmarks.
+        /// </summary>
+        protected virtual bool CFG_TRACKING_TO_LAST => true;
         /// <summary>
         /// Configure calculation of beta. If this property is set to false,
         /// beta is calculated vs the benchmark. If this property is set to true,
@@ -275,7 +292,7 @@ namespace TuringTrader
             var TRIALS = 500 * 100 / LEFT_TAIL;
             var YEARS = 25;
 
-            Random rnd = new Random();
+            Random rnd = new Random(0);
             var pathes = new List<List<double>>();
 
             for (var trials = 0; trials < TRIALS; trials++)
@@ -284,14 +301,14 @@ namespace TuringTrader
                 var nav = 1.0;
                 path.Add(nav); // FIXME: do all pathes need to start at 1.0?
 
-                pathes.Add(path);
-
                 for (var months = 0; months < 12 * YEARS; months++)
                 {
                     var monthlyRet = Math.Exp(monthlyDistribution[rnd.Next(monthlyDistribution.Count)]);
                     nav *= monthlyRet;
                     path.Add(nav);
                 }
+
+                pathes.Add(path);
             }
 
             //===== create 5-th percentile envelopes
@@ -336,12 +353,12 @@ namespace TuringTrader
 
             //===== create swarm of price pathes
             // * each path starts with a drawdown
-            // * one the drawdown is recovered, each path is pegged to zero
+            // * once the drawdown is recovered, it is pegged to zero
 
-            var TRIALS = 100 * 100 / LEFT_TAIL * 100 / LEFT_TAIL;
+            var TRIALS = 250 * 100 / LEFT_TAIL * 100 / LEFT_TAIL;
             var YEARS = 25;
 
-            Random rnd = new Random();
+            Random rnd = new Random(0);
             var pathes = new List<List<double>>();
 
             for (var trials = 0; trials < TRIALS; trials++)
@@ -350,8 +367,6 @@ namespace TuringTrader
                 var nav = 1.0;
                 path.Add(0.0);
                 var isDrawdown = true;
-
-                pathes.Add(path);
 
                 for (var months = 0; months < 12 * YEARS; months++)
                 {
@@ -365,26 +380,27 @@ namespace TuringTrader
 
                     path.Add(isDrawdown ? nav - 1.0 : 0.0);
                 }
+
+                pathes.Add(path);
             }
 
             //===== pick the worst drawdowns
             var worstPathes = pathes
-                .OrderBy(path => path.Min()) // deepest drawdowns
-                //.OrderByDescending(path => path.Sum(dd => Math.Pow(dd, 2.0))) // Ulcer Index
+                //.OrderBy(path => path.Min()) // deepest drawdowns
+                .OrderByDescending(path => path.Sum(dd => Math.Pow(dd, 2.0))) // Ulcer Index
                 .Take((int)Math.Round(pathes.Count * LEFT_TAIL / 100.0))
                 .ToList();
 
             //===== create envelope
-            var envelope = Enumerable.Range(0, worstPathes.First().Count)
+            var envelope = Enumerable.Range(0, 12 * YEARS)
                 .ToDictionary(
                     t => t / 12.0,
-                    t => pathes
+                    t => worstPathes
                         .Select(path => path[t])
                         .OrderBy(dd => dd)
                         .Take((int)Math.Round(worstPathes.Count * LEFT_TAIL / 100.0))
                         .Last());
 
-            //===== create 5-th percentile envelopes
             return envelope;
         }
         protected Dictionary<double, double> _leftTailReturns(string label, double LEFT_TAIL, out Dictionary<double, double> mdd)
@@ -464,6 +480,11 @@ namespace TuringTrader
             return cagrs;
         }
 
+        protected Dictionary<double, double> _rightTailReturns(string label, double rightTail)
+        {
+            var (leftCagr, rightCagr) = _tailCagr(label, 5, (int)Math.Round(100.0 * rightTail));
+            return rightCagr;
+        }
         protected double _avgMonthlyReturn(string label) => _monthlyReturns(label).Values.Average(r => r);
         protected double _stdMonthlyReturn(string label)
         {
@@ -479,7 +500,49 @@ namespace TuringTrader
 
             return Math.Sqrt(12.0) * avg / Math.Sqrt(var);
         }
+#if EXTENSION
+        protected double _sortinoRatio(string label)
+        {
+            const double _targetReturn = 0d;  // annual target (risk free?) return
 
+            //===== create annual bars
+            Dictionary<int, double> yearlyBars = new Dictionary<int, double>();
+            var series = _getSeries(label);
+            DateTime lastTime = series.Last().Key;
+
+            int? currentYear = null;
+            double prevYearClose = 0.0;
+            double prevDayClose = 0.0;
+            foreach (var point in series)
+            {
+                if (currentYear == null)
+                {
+                    currentYear = point.Key.Year;
+                    prevDayClose = point.Value;
+                    prevYearClose = point.Value;
+                }
+
+                if (currentYear < point.Key.Date.Year
+                || point.Key == lastTime)
+                {
+                    double refValue = point.Key == lastTime ? point.Value : prevDayClose;
+                    double pnl = 100.0 * (refValue / (double)prevYearClose - 1.0);
+
+                    yearlyBars[(int)currentYear] = pnl;
+
+                    prevYearClose = prevDayClose;
+                    currentYear = point.Key.Year;
+                }
+
+                prevDayClose = point.Value;
+            }
+
+            var avg = yearlyBars.Values.Average(r => r) - _targetReturn;
+            var ttd = yearlyBars.Values.Average(t => (t - _targetReturn) >= 0 ? 0 : Math.Pow(t / 100, 2));
+
+            return avg / (Math.Sqrt(ttd) * 100);
+        }
+#endif
         // FIXME: somehow we need to escape the carrot, as XAML treats it
         //        as a special character
         // https://stackoverflow.com/questions/6720285/how-do-i-escape-a-slash-character-in-a-wpf-binding-path-or-how-to-work-around
@@ -706,7 +769,10 @@ namespace TuringTrader
                     typeof(long), typeof(short),   typeof(sbyte),
                     typeof(byte), typeof(ulong),   typeof(ushort),
                     typeof(uint), typeof(float),
-                    typeof(DateTime)
+#if EXTENSION
+                    typeof(SimulatorV2.CandleStickItem),
+#endif
+                typeof(DateTime)
                 };
 
             Type type = obj.GetType();
@@ -887,6 +953,7 @@ namespace TuringTrader
                         newSeries.XAxisKey = "x";
                         newSeries.YAxisKey = "y";
                         newSeries.Color = CFG_COLORS[allSeries.Count % CFG_COLORS.Count()];
+                        //newSeries.StrokeThickness = 5;
                         allSeries[yLabel] = newSeries;
                     }
 
@@ -1066,7 +1133,7 @@ namespace TuringTrader
                         XAxisKey = "x",
                         YAxisKey = "y",
                         Color = color,
-                        Fill = i == 0? CFG_COLOR0_FILL : color,
+                        Fill = i == 0 ? CFG_COLOR0_FILL : color,
                         ConstantY2 = 1.0,
                     }
                     : new LineSeries
@@ -1111,7 +1178,12 @@ namespace TuringTrader
 
                     eqSeries.Points.Add(new DataPoint(
                         DateTimeAxis.ToDouble(x),
+#if EXTENSION
+                        // logarithmic scale has an issue with values lower/equal zero,
+                        y > 0 ? (double)y / y0 : 0.01d));
+#else
                         (double)y / y0));
+#endif
 
                     ddSeries.Points.Add(new DataPoint(
                         DateTimeAxis.ToDouble(x),
@@ -1177,7 +1249,7 @@ namespace TuringTrader
             foreach (var label in _yLabels)
                 row[_xamlLabel(label)] = string.Format("{0:P2}",
                     Math.Sqrt(12.0) * _stdMonthlyReturn(label)); // likely incorrect as we are using log-returns
-                    //(Math.Exp(Math.Sqrt(12.0) * _stdMonthlyReturn(label)) - 1.0)); // is this better? code cuplicated in RenderComps!
+                                                                 //(Math.Exp(Math.Sqrt(12.0) * _stdMonthlyReturn(label)) - 1.0)); // is this better? code cuplicated in RenderComps!
             retvalue.Add(row);
 
 
@@ -1232,6 +1304,14 @@ namespace TuringTrader
             foreach (var label in _yLabels)
                 row[_xamlLabel(label)] = string.Format("{0:F2}", _ulcerPerformanceIndex(label));
             retvalue.Add(row);
+
+#if EXTENSION
+            row = new Dictionary<string, object>();
+            row[METRIC_LABEL] = "Sortino Ratio";
+            foreach (var label in _yLabels)
+                row[_xamlLabel(label)] = string.Format("{0:F2}", _sortinoRatio(label));
+            retvalue.Add(row);
+#endif
 
             // Information Ratio
             // Sortino Ratio
@@ -2000,7 +2080,49 @@ namespace TuringTrader
 
             foreach (var p in periods)
             {
+#if false
+                // retired 2024i08
                 DateTime datePastTarget = dateLast - TimeSpan.FromDays(p.Item2 * 365.25);
+#else
+                // new 2024i08
+                DateTime datePastTarget;
+
+                if (Math.Abs(p.Item2 - 1 / 52.0) < 1e-4)
+                {
+                    // multi-week
+                    var weeksBack = (int)Math.Round(52.0 * p.Item2);
+
+                    datePastTarget = dateLast - TimeSpan.FromDays(7 * weeksBack);
+                }
+                else if (p.Item2 < 1.0)
+                {
+                    // multi-month
+                    var monthsBack = (int)Math.Round(12.0 * p.Item2);
+
+                    var month = (dateLast.Month + 11 - monthsBack) % 12 + 1;
+
+                    var year = month < dateLast.Month
+                        ? dateLast.Year
+                        : dateLast.Year - 1;
+
+                    var day = month == 2
+                        ? Math.Min(dateLast.Day, 28)  // FIXME
+                        : Math.Min(dateLast.Day, 30); // FIXME
+
+                    datePastTarget = new DateTime(year, month, day) + dateLast.TimeOfDay;
+                }
+                else
+                {
+                    // multi-year
+                    var yearsBack = (int)Math.Round(p.Item2);
+
+                    var day = dateLast.Month == 2
+                        ? Math.Min(dateLast.Day, 28)  // FIXME
+                        : Math.Min(dateLast.Day, 30); // FIXME
+
+                    datePastTarget = new DateTime(dateLast.Year - yearsBack, dateLast.Month, day) + dateLast.TimeOfDay;
+                }
+#endif
                 Dictionary<string, object> rowPast = _firstChart
                     .OrderBy(r => Math.Abs((datePastTarget - (DateTime)r[_xLabel]).TotalSeconds))
                     .First();
@@ -2016,10 +2138,19 @@ namespace TuringTrader
             }
             //--- year-to-date
             {
+#if false
+                // retired 2024i08: calculate against close of first day of the year
                 DateTime datePastTarget = dateLast - TimeSpan.FromDays(dateLast.DayOfYear);
                 Dictionary<string, object> rowPast = _firstChart
                     .OrderBy(r => Math.Abs((datePastTarget - (DateTime)r[_xLabel]).TotalSeconds))
                     .First();
+#else
+                // new 2024i08: calculate against close of last day of previous year
+                Dictionary<string, object> rowPast = _firstChart
+                    .Where(r => ((DateTime)r[_xLabel]).Year < dateLast.Year)
+                    .OrderByDescending(r => ((DateTime)r[_xLabel]).Ticks)
+                    .First();
+#endif
                 DateTime datePast = (DateTime)rowPast[_xLabel];
                 double years = (dateLast - datePast).TotalDays / 365.25;
                 double navPast = (double)rowPast[_firstYLabel];
@@ -2048,11 +2179,18 @@ namespace TuringTrader
                 Tuple.Create<string, Func<object>>("martin", () => _ulcerPerformanceIndex(_firstYLabel)),
                 Tuple.Create<string, Func<object>>("nav-end", ()  => 1000.0 * _endValue(_firstYLabel) / _startValue(_firstYLabel)),
                 Tuple.Create<string, Func<object>>("cagr-5th", () => "[" + _leftTailReturns(_firstYLabel, 0.05)
-                    .Where(kv => kv.Key > 0.0 && kv.Key < 25.1 
+                    .Where(kv => kv.Key > 0.0 && kv.Key < 25.1
                         && Math.Abs(kv.Key - Math.Round(kv.Key)) < 1.0 / 24.0)
                     .Select(kv => kv.Value)
-                    .Aggregate("", (agg, item) => agg 
-                        + (agg.Length > 0 ? "," : "") 
+                    .Aggregate("", (agg, item) => agg
+                        + (agg.Length > 0 ? "," : "")
+                        + string.Format("{0:F2}", 100.0 * item)) + "]"),
+                Tuple.Create<string, Func<object>>("cagr-95th", () => "[" + _rightTailReturns(_firstYLabel, 0.95)
+                    .Where(kv => kv.Key > 0.0 && kv.Key < 25.1
+                        && Math.Abs(kv.Key - Math.Round(kv.Key)) < 1.0 / 24.0)
+                    .Select(kv => kv.Value)
+                    .Aggregate("", (agg, item) => agg
+                        + (agg.Length > 0 ? "," : "")
                         + string.Format("{0:F2}", 100.0 * item)) + "]"),
                 Tuple.Create<string, Func<object>>("mdd-5th", () =>
                 {
@@ -2180,16 +2318,19 @@ namespace TuringTrader
             #region plotTracking
             void plotTracking(int i)
             {
-                if (i >= _numYLabels - 1)
-                    return;
+                if (CFG_TRACKING_TO_LAST)
+                {
+                    // until 2023vi12 - benchmark all against last
+                    if (i >= _numYLabels - 1)
+                        return;
 
-                var benchSeries = _getSeries(_benchYLabel);
+                    var benchSeries = _getSeries(_benchYLabel);
 
-                string yLabel = _yLabels[i];
-                var series = _getSeries(yLabel);
-                var color = CFG_COLORS[i % CFG_COLORS.Count()];
+                    string yLabel = _yLabels[i];
+                    var series = _getSeries(yLabel);
+                    var color = CFG_COLORS[i % CFG_COLORS.Count()];
 
-                var trkSeries = /*CFG_IS_AREA(yLabel)
+                    var trkSeries = /*CFG_IS_AREA(yLabel)
                     ? new AreaSeries
                     {
                         Title = yLabel,
@@ -2209,31 +2350,92 @@ namespace TuringTrader
                             Color = color,
                         };
 
-                plotModel.Series.Add(trkSeries);
+                    plotModel.Series.Add(trkSeries);
 
-                var navFiltered = (double?)null;
-                var benchFiltered = (double?)null;
-                var scale = (double?)null;
-                foreach (var point in series)
+                    var navFiltered = (double?)null;
+                    var benchFiltered = (double?)null;
+                    var scale = (double?)null;
+                    foreach (var point in series)
+                    {
+                        var dateCurrent = point.Key;
+                        var navCurrent = point.Value;
+                        var benchCurrent = benchSeries[dateCurrent];
+
+                        const double ALPHA = 2.0 / (40.0 + 1.0);
+                        navFiltered = navFiltered == null
+                            ? navCurrent
+                            : ALPHA * (navCurrent - navFiltered) + navFiltered;
+                        benchFiltered = benchFiltered == null
+                            ? benchCurrent
+                            : ALPHA * (benchCurrent - benchFiltered) + benchFiltered;
+                        scale = scale ?? benchCurrent / navCurrent;
+
+                        var tracking = 100.0 * ((double)(scale * navFiltered / benchFiltered) - 1.0);
+
+                        trkSeries.Points.Add(new DataPoint(
+                            DateTimeAxis.ToDouble(dateCurrent),
+                            tracking));
+                    }
+                }
+                else
                 {
-                    var dateCurrent = point.Key;
-                    var navCurrent = point.Value;
-                    var benchCurrent = benchSeries[dateCurrent];
+                    // since 2023vi12 - benchmark first against all others
+                    if (i == 0)
+                        return;
 
-                    const double ALPHA = 2.0 / (40.0 + 1.0);
-                    navFiltered = navFiltered == null
-                        ? navCurrent
-                        : ALPHA * (navCurrent - navFiltered) + navFiltered;
-                    benchFiltered = benchFiltered == null
-                        ? benchCurrent
-                        : ALPHA * (benchCurrent - benchFiltered) + benchFiltered;
-                    scale = scale ?? benchCurrent / navCurrent;
+                    var series = _getSeries(_firstYLabel);
 
-                    var tracking = 100.0 * ((double)(scale * navFiltered / benchFiltered) - 1.0);
+                    string yLabel = _yLabels[i];
+                    var benchSeries = _getSeries(yLabel);
 
-                    trkSeries.Points.Add(new DataPoint(
-                        DateTimeAxis.ToDouble(dateCurrent),
-                        tracking));
+                    var color = CFG_COLORS[i % CFG_COLORS.Count()];
+
+                    var trkSeries = /*CFG_IS_AREA(yLabel)
+                    ? new AreaSeries
+                    {
+                        Title = yLabel,
+                        IsVisible = true,
+                        XAxisKey = "x",
+                        YAxisKey = "y",
+                        Color = color,
+                        Fill = i == 0 ? CFG_COLOR0_FILL : color,
+                        ConstantY2 = 1.0,
+                    }
+                    :*/ new LineSeries
+                        {
+                            //Title = yLabel + " vs " + _benchYLabel,
+                            IsVisible = true,
+                            XAxisKey = "x",
+                            YAxisKey = "trk",
+                            Color = color,
+                        };
+
+                    plotModel.Series.Add(trkSeries);
+
+                    var navFiltered = (double?)null;
+                    var benchFiltered = (double?)null;
+                    var scale = (double?)null;
+                    foreach (var point in series)
+                    {
+                        var dateCurrent = point.Key;
+                        var navCurrent = point.Value;
+                        var benchCurrent = benchSeries[dateCurrent];
+
+                        const double ALPHA = 2.0 / (40.0 + 1.0);
+                        navFiltered = navFiltered == null
+                            ? navCurrent
+                            : ALPHA * (navCurrent - navFiltered) + navFiltered;
+                        benchFiltered = benchFiltered == null
+                            ? benchCurrent
+                            : ALPHA * (benchCurrent - benchFiltered) + benchFiltered;
+                        scale = scale ?? benchCurrent / navCurrent;
+
+                        var tracking = 100.0 * ((double)(scale * navFiltered / benchFiltered) - 1.0);
+
+                        trkSeries.Points.Add(new DataPoint(
+                            DateTimeAxis.ToDouble(dateCurrent),
+                            tracking));
+                    }
                 }
             }
             #endregion
@@ -2483,8 +2685,8 @@ namespace TuringTrader
             OxyPlot.Wpf.PngExporter.Export(model,
                 pngFilePath,
                 width, height);
-                //OxyColors.White);
-                //OxyColor.FromArgb(0, 0, 0, 0)); // transparent
+            //OxyColors.White);
+            //OxyColor.FromArgb(0, 0, 0, 0)); // transparent
 #endif
         }
         #endregion
@@ -2775,9 +2977,14 @@ namespace TuringTrader
                     else if (IsScatter(selectedChart))
                         retvalue = RenderScatter(selectedChart);
                     else
+#if EXTENSION
+                        retvalue = ExtensionRenderSimple(selectedChart);
+#else
                         retvalue = RenderSimple(selectedChart);
+#endif
                     break;
-            };
+            }
+            ;
 
             if (retvalue.GetType() == typeof(PlotModel))
             {
@@ -2794,6 +3001,121 @@ namespace TuringTrader
             return retvalue;
         }
         #endregion
+#if EXTENSION
+        /// <summary>
+        /// Render Candlestick chart
+        /// </summary>
+        /// <param name="selectedChart"></param>
+        /// <returns>plot model</returns>
+        protected PlotModel ExtensionRenderSimple(string selectedChart)
+        {
+            //===== get plot data
+            var chartData = PlotData[selectedChart];
+
+            string xLabel = chartData
+                .First()      // first row is as good as any
+                .First().Key; // first column is x-axis
+
+            object xValue = chartData
+                .First()        // first row is as good as any
+                .First().Value; // first column is x-axis
+
+            //===== initialize plot model
+            PlotModel plotModel = new PlotModel();
+            plotModel.Title = selectedChart;
+            if (chartData.First().Count < 25)
+                plotModel.Legends.Add(new Legend() { LegendPosition = LegendPosition.TopLeft });
+            plotModel.Axes.Clear();
+
+            Axis xAxis = xValue.GetType() == typeof(DateTime)
+                ? new DateTimeAxis()
+                : new LinearAxis();
+            xAxis.Title = xLabel;
+            xAxis.Position = AxisPosition.Bottom;
+            xAxis.Key = "x";
+
+            var yAxis = CFG_IS_LOG ? (OxyPlot.Axes.Axis)new LogarithmicAxis() : new LinearAxis();
+            yAxis.Position = AxisPosition.Right;
+            yAxis.Key = "y";
+
+            plotModel.Axes.Add(xAxis);
+            plotModel.Axes.Add(yAxis);
+
+            //===== create series
+            Dictionary<string, LineSeries> allSeries = new Dictionary<string, LineSeries>();
+
+            var ohlcvItems = new List<SimulatorV2.CandleStickItem>();
+
+            foreach (var row in chartData)
+            {
+                xValue = row[xLabel];
+
+                foreach (var col in row)
+                {
+                    if (col.Key == xLabel)
+                        continue;
+
+                    if (col.Value.GetType() == typeof(SimulatorV2.CandleStickItem))
+                    {
+                        SimulatorV2.CandleStickItem ohlcvQuotes = (SimulatorV2.CandleStickItem)col.Value;
+                        if (double.IsInfinity((double)ohlcvQuotes.O) || double.IsNaN((double)ohlcvQuotes.O) ||
+                            double.IsInfinity((double)ohlcvQuotes.H) || double.IsNaN((double)ohlcvQuotes.H) ||
+                            double.IsInfinity((double)ohlcvQuotes.L) || double.IsNaN((double)ohlcvQuotes.L) ||
+                            double.IsInfinity((double)ohlcvQuotes.C) || double.IsNaN((double)ohlcvQuotes.C)
+                            ) continue;
+
+                        ohlcvItems.Add(ohlcvQuotes);
+                    }
+                    else
+                    {
+                        // new 2020v01
+                        if (!IsNumeric(col.Value))
+                            continue;
+
+                        if (col.Value.GetType() == typeof(double)
+                        && (double.IsInfinity((double)col.Value) || double.IsNaN((double)col.Value)))
+                            continue;
+
+                        string yLabel = col.Key;
+                        double yValue = col.Value.GetType() == typeof(double)
+                            ? (double)col.Value
+                            : (double)(int)col.Value;
+
+                        if (!allSeries.ContainsKey(yLabel))
+                        {
+                            var newSeries = new LineSeries();
+                            newSeries.Title = CFG_HAS_LEGEND ? yLabel : "";
+                            newSeries.IsVisible = true;
+                            newSeries.XAxisKey = "x";
+                            newSeries.YAxisKey = "y";
+                            newSeries.Color = CFG_COLORS[allSeries.Count % CFG_COLORS.Count()];
+                            allSeries[yLabel] = newSeries;
+                        }
+
+                        allSeries[yLabel].Points.Add(new DataPoint(
+                            xValue.GetType() == typeof(DateTime) ? DateTimeAxis.ToDouble(xValue) : (double)xValue,
+                            (double)yValue));
+                    }
+                }
+            }
+
+            //===== add series to plot model
+            foreach (var series in allSeries)
+                plotModel.Series.Add(series.Value);
+
+
+            if (ohlcvItems.Count > 0)
+            {
+                var newCandleSeries = new CandleStickSeries();
+                newCandleSeries.Title = CFG_HAS_LEGEND ? selectedChart : "";
+                ohlcvItems.ForEach(a => newCandleSeries.Items.Add(new HighLowItem(DateTimeAxis.ToDouble(a.XDateTime), a.H, a.L, a.O, a.C)));
+                newCandleSeries.TrackerFormatString = "High: {3:0.00}\nLow: {4:0.00}\nOpen: {5:0.00}\nClose: {6:0.00}\nAsOf:{2:yyyy-MM-dd}";
+                plotModel.Series.Add(newCandleSeries);
+            }
+
+            return plotModel;
+        }
+#endif
     }
 
     public abstract class ReportTemplate : _ReportTemplate

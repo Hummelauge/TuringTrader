@@ -68,7 +68,7 @@ namespace TuringTrader.Indicators
 
         #region public static _CAPM CAPM(this Instrument series, Instrument benchmark, int n)
         /// <summary>
-        /// Calculate Capital Asset Pricing Model parameters.
+        /// Calculate Capital Symbol Pricing Model parameters.
         /// <see href="http://en.wikipedia.org/wiki/Capital_asset_pricing_model"/>
         /// This indicator uses an exponentially-weighted, incremental method of
         /// calculation, based on Tony Finch, which is very fast and efficient.
@@ -94,7 +94,7 @@ namespace TuringTrader.Indicators
         #endregion
         #region public static _CAPM CAPM(this ITimeSeries<double> series, ITimeSeries<double> benchmark, int n)
         /// <summary>
-        /// Calculate Capital Asset Pricing Model parameters.
+        /// Calculate Capital Symbol Pricing Model parameters.
         /// <see href="http://en.wikipedia.org/wiki/Capital_asset_pricing_model"/>
         /// This indicator uses an exponentially-weighted, incremental method of
         /// calculation, based on Tony Finch, which is very fast and efficient.

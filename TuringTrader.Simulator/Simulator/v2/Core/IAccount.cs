@@ -71,7 +71,12 @@ namespace TuringTrader.SimulatorV2
         /// <param name="weight">asset target allocation</param>
         /// <param name="orderType">order type</param>
         /// <param name="orderPrice">trigger price for stop and limit orders</param>
+#if EXTENSION
+        /// <param name="comment">additional information</param>
+        public void SubmitOrder(string Name, double weight, OrderType orderType, double orderPrice = 0.0, string comment = "");
+#else
         public void SubmitOrder(string Name, double weight, OrderType orderType, double orderPrice = 0.0);
+#endif
 
         /// <summary>
         /// Process bar. This method will loop through the queued
@@ -106,13 +111,13 @@ namespace TuringTrader.SimulatorV2
         public class OrderTicket
         {
             /// <summary>
-            /// Asset name. This is the name that was used to load the asset,
+            /// Symbol name. This is the name that was used to load the asset,
             /// which may or may not be identical to the asset's ticker symbol.
             /// </summary>
             public readonly string Name;
 
             /// <summary>
-            /// Asset target allocation, as fraction of NAV.
+            /// Symbol target allocation, as fraction of NAV.
             /// </summary>
             public readonly double TargetAllocation;
 
@@ -131,6 +136,13 @@ namespace TuringTrader.SimulatorV2
             /// </summary>
             public readonly double OrderPrice;
 
+#if EXTENSION
+            /// <summary>
+            /// Additional information.
+            /// </summary>
+            public readonly string Comment;
+#endif
+
             /// <summary>
             /// Create new order ticket.
             /// </summary>
@@ -139,6 +151,18 @@ namespace TuringTrader.SimulatorV2
             /// <param name="orderType"></param>
             /// <param name="orderPrice"></param>
             /// <param name="submitDate"></param>
+#if EXTENSION
+            /// <param name="comment"></param>
+            public OrderTicket(DateTime submitDate, string symbol, double targetAllocation, OrderType orderType, double orderPrice = 0.0, string comment = "")
+            {
+                Name = symbol;
+                TargetAllocation = targetAllocation;
+                OrderType = orderType;
+                SubmitDate = submitDate;
+                OrderPrice = orderPrice;
+                Comment = comment;
+            }
+#else
             public OrderTicket(DateTime submitDate, string symbol, double targetAllocation, OrderType orderType, double orderPrice = 0.0)
             {
                 Name = symbol;
@@ -147,6 +171,7 @@ namespace TuringTrader.SimulatorV2
                 SubmitDate = submitDate;
                 OrderPrice = orderPrice;
             }
+#endif
         }
 
         /// <summary>

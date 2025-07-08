@@ -39,7 +39,7 @@ results of different strategies comparable:
    because most things go up during a bull market. The long-term return for 
    investors is not determined by what they make during a bull market but by how 
    much they keep during a bear market.
-3. Asset-class reallocation should take place at the close of the last trading 
+3. Symbol-class reallocation should take place at the close of the last trading 
    day of the month. We only have monthly closes — not daily closes — for asset 
    classes back to Dec. 31, 1972. This data is in the Quant simulator, which was 
    developed by Mebane Faber using information from Global Financial Data (and used 

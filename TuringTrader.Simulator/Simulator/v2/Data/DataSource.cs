@@ -41,6 +41,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 #endregion
 
@@ -327,6 +328,18 @@ namespace TuringTrader.SimulatorV2
                 // colon: extract data source
                 info[DataSourceParam.nickName2] = nickname.Substring(idx + 1);
                 info[DataSourceParam.dataFeed] = nickname.Substring(0, idx);
+#if EXTENSION
+                var fakeOptionData = info[DataSourceParam.nickName2].Split("||");
+                if (fakeOptionData.Length == 4)
+                {
+                    info[DataSourceParam.nickName2] = fakeOptionData[0];
+                    info[DataSourceParam.optionUnderlying] = fakeOptionData[0];
+                    info[DataSourceParam.optionRight] = fakeOptionData[1];
+                    info[DataSourceParam.optionStrike] = fakeOptionData[2];
+                    info[DataSourceParam.optionExpiration] = fakeOptionData[3];
+                    info[DataSourceParam.dataFeed] = "fake_option";
+                }
+#endif            
             }
 #else
             // set nickname2 and datafeed from nickname
@@ -432,6 +445,9 @@ namespace TuringTrader.SimulatorV2
 #if ENABLE_ALGO
                 Tuple.Create("algo", (Action)null, AlgoGetAsset),
 #endif
+#if EXTENSION
+                Tuple.Create("fake_option", (Action)null, FakeOptionGetAsset),
+#endif
                 };
 
         private static Tuple<List<BarType<OHLCV>>, TimeSeriesAsset.MetaType> _loadAsset(Algorithm owner, string nickname)
@@ -503,8 +519,9 @@ namespace TuringTrader.SimulatorV2
             return dst;
         }
 
-        private static object _lockGetMeta = new object();
-        private static object _lockGetData = new object();
+        // FIXME: these are public, so that the v1 engine can access them
+        public static object _lockGetMeta = new object();
+        public static object _lockGetData = new object();
 
         /// <summary>
         /// Helper function to load, parse, and extract data through a disk cache. 
@@ -545,23 +562,49 @@ namespace TuringTrader.SimulatorV2
                     //--- 1) try to read raw json from disk
                     if (File.Exists(timeStamps) && File.Exists(dataCache))
                     {
-                        using (BinaryReader pc = new BinaryReader(File.Open(dataCache, FileMode.Open)))
-                            rawData = pc.ReadString();
-
                         using (BinaryReader ts = new BinaryReader(File.Open(timeStamps, FileMode.Open)))
                         {
                             DateTime cacheStartTime = new DateTime(ts.ReadInt64());
                             DateTime cacheEndTime = new DateTime(ts.ReadInt64());
 
+#if EXTENSION
+                            DateTime cacheLastUpdateTime = DateTime.MinValue;
+                            try
+                            { cacheLastUpdateTime = new DateTime(ts.ReadInt64()); }
+                            catch (System.IO.EndOfStreamException ex)
+                            { } // if we can't read the last update time, we assume that there never was an update OR the timestamp file was created by the original version of the simulator
+
+                            if (cacheEndTime >= endDate
+                                || (cacheLastUpdateTime - cacheEndTime).TotalDays > 90)
+#else
                             if (cacheStartTime <= startDate && cacheEndTime >= endDate)
+#endif
+                            {
+                                using (BinaryReader pc = new BinaryReader(File.Open(dataCache, FileMode.Open)))
+                                    rawData = pc.ReadString();
                                 parsedData = parseData(rawData);
+                            }
                         }
                     }
 
                     //--- 2) if failed, try to retrieve from web
                     if (parsedData == null)
                     {
-                        var tmpData = getData();
+                        // try loading data no more than twice
+                        var tmpData = (string)null;
+                        for (int i = 0; i < 2; i++)
+                        {
+                            try
+                            {
+                                tmpData = getData();
+                                break;
+                            }
+                            catch (Exception /*ex*/)
+                            {
+                                // ignore
+                            }
+                        }
+
                         parsedData = parseData(tmpData);
 
                         if (parsedData != null)
@@ -580,6 +623,32 @@ namespace TuringTrader.SimulatorV2
                         }
                     }
 
+#if EXTENSION
+                    //--- 3) if failed, throw
+                    if (parsedData == null)
+                        throw new Exception(string.Format("Failed to load data for {0}", info[DataSourceParam.nickName]));
+
+                    //--- 4) extract data for TuringTrader
+                    var convertedData = extractData(parsedData);
+
+                    //--- 5) if newly retrieved, write to disk
+                    if (writeToDisk)
+                    {
+                        Directory.CreateDirectory(cachePath);
+                        using (BinaryWriter pc = new BinaryWriter(File.Open(dataCache, FileMode.Create)))
+                            pc.Write(rawData);
+
+                        using (BinaryWriter ts = new BinaryWriter(File.Open(timeStamps, FileMode.Create)))
+                        {
+                            // we write the dates we received. 
+                            ts.Write(convertedData.First().Date.Ticks);
+                            ts.Write(convertedData.Last().Date.Ticks);
+                            ts.Write(DateTime.Now.Ticks); // last update time
+                        }
+                    }
+
+                    return convertedData;
+#else
                     //--- 3) if failed, return
                     if (parsedData == null)
                         return null;
@@ -604,6 +673,7 @@ namespace TuringTrader.SimulatorV2
 
                     //--- 5) extract data for TuringTrader
                     return extractData(parsedData);
+#endif
                 }
             }
             catch (Exception ex)
@@ -678,6 +748,16 @@ namespace TuringTrader.SimulatorV2
                     return extractMeta(parsedMeta);
                 }
             }
+#if EXTENSION
+            catch (AggregateException ex)
+            {
+                return new TimeSeriesAsset.MetaType()
+                {
+                    Description = info[DataSourceParam.nickName2],
+                    Ticker = info[DataSourceParam.nickName2]
+                };
+            }
+#endif
             catch (Exception ex)
             {
                 throw new Exception(string.Format("Failed to load meta for {0}: {1}", info[DataSourceParam.nickName], ex.Message));

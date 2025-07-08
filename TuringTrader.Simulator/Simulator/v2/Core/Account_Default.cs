@@ -24,6 +24,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TuringTrader.Simulator;
 
 namespace TuringTrader.SimulatorV2
 {
@@ -47,6 +48,15 @@ namespace TuringTrader.SimulatorV2
         // TODO: revisit default friction. 0.1% might be a better choice?
         private const double DEFAULT_FRICTION = 0.0005; // $100.00 x 0.05% = $0.05
         private double _friction = DEFAULT_FRICTION;
+
+#if EXTENSION
+        private ITradingCalendar _calendar = new TradingCalendar_US();
+
+        private Dictionary<string, List<TTExtEntryPosition>> _openEntries = new();
+        private List<TTExtPosition> _closedPositions = new();
+        private int _positionCounter = 0;
+        private int _loopCounter = 0;
+#endif
 
         private enum NavType
         {
@@ -89,6 +99,16 @@ namespace TuringTrader.SimulatorV2
         /// <param name="weight">asset target allocation</param>
         /// <param name="orderType">order type</param>
         /// <param name="orderPrice">trigger price for stop and limit orders</param>
+#if EXTENSION
+        /// <param name="comment">Additional information</param>
+        public void SubmitOrder(string Name, double weight, OrderType orderType, double orderPrice = 0.0, string comment = "")
+        {
+            _orderQueue.Add(
+                new IAccount.OrderTicket(
+                    _algorithm.SimDate,
+                    Name, weight, orderType, orderPrice, comment));
+        }
+#else
         public void SubmitOrder(string Name, double weight, OrderType orderType, double orderPrice = 0.0)
         {
             _orderQueue.Add(
@@ -96,6 +116,7 @@ namespace TuringTrader.SimulatorV2
                     _algorithm.SimDate,
                     Name, weight, orderType, orderPrice));
         }
+#endif
 
         /// <summary>
         /// Process bar. This method will loop through the queued
@@ -113,16 +134,22 @@ namespace TuringTrader.SimulatorV2
             var navOpen = 0.0;
             var navClose = 0.0;
 
+#if EXTENSION
+            foreach (var symbol in OpenEntries)
+                foreach (var pos in symbol.Value)
+                    pos.BarsHeld += 1;
+#endif
+
             foreach (var orderTypeFilter in new List<OrderType> {
-                // this list is ordered chronologically
-                OrderType.closeThisBar,
-                OrderType.openNextBar,
-                // we expect sells to happen before buys,
-                // and stop orders before limit orders
-                OrderType.sellStopNextBar,
-                OrderType.sellLimitNextBar,
-                OrderType.buyStopNextBar,
-                OrderType.buyLimitNextBar})
+                    // this list is ordered chronologically
+                    OrderType.closeThisBar,
+                    OrderType.openNextBar,
+                    // we expect sells to happen before buys,
+                    // and stop orders before limit orders
+                    OrderType.sellStopNextBar,
+                    OrderType.sellLimitNextBar,
+                    OrderType.buyStopNextBar,
+                    OrderType.buyLimitNextBar})
             {
                 // execute pending next-day market-on-open orders on close of last bar
                 var orderType = orderTypeFilter switch
@@ -229,6 +256,21 @@ namespace TuringTrader.SimulatorV2
                             ? price * (1.0 + Friction) // when buying, we reduce the # of shares to cover for commissions
                             : price;
                         var deltaShares = nav * (targetAlloc - currentAlloc) / price2;
+
+#if EXTENSION
+                        if (MinimumCash != null
+                            && isBuy == true
+                            && (Cash - targetAlloc + currentAlloc) < MinimumCash)
+                            continue;
+
+                        AddClosedPosition(new IAccount.OrderReceipt(
+                                order,
+                                execDate,
+                                targetAlloc - currentAlloc,
+                                price,
+                                deltaShares * price,
+                                Math.Abs(deltaShares) * price * Friction));
+#endif
 
                         if (targetAlloc != 0.0)
                         {
@@ -354,7 +396,316 @@ namespace TuringTrader.SimulatorV2
         /// account's liquidation value.
         /// </summary>
         public double MinPosition { get; set; } = 0.001; // 0.1%  minimum position
+
+#if EXTENSION
+
+        /// <summary>
+        /// Minimum Cash
+        /// </summary> 
+        public double? MinimumCash { get; set; }
+
+        /// <summary>
+        /// Closed Positions
+        /// </summary> 
+        public List<TTExtPosition> ClosedPositions { get => _closedPositions; }
+
+        /// <summary>
+        /// Initial Capital
+        /// </summary>
+        public double IniCapital = INITIAL_CAPITAL;
+
+        /// <summary>
+        /// Currently open Positions
+        /// </summary>
+        public Dictionary<string, List<TTExtEntryPosition>> OpenEntries
+        {
+            get
+            {
+                foreach (var symbol in _openEntries)
+                    foreach (var positionEntry in symbol.Value)
+                        positionEntry.OpenProfitPerc = (double)(_algorithm.Asset(positionEntry.Symbol).Close[0] - positionEntry.EntryOrder.FillPrice) / positionEntry.EntryOrder.FillPrice * 100;
+                return _openEntries;
+            }
+        }
+
+        private void AddClosedPosition(IAccount.OrderReceipt order, bool lastInFirstOut = true)
+        {
+            _loopCounter++;
+
+            if (!_openEntries.ContainsKey(order.OrderTicket.Name))
+                _openEntries[order.OrderTicket.Name] = new List<TTExtEntryPosition>();
+
+            var openEntryQuantity = _openEntries[order.OrderTicket.Name].Sum(i => i.OpenQuantity);
+            var openCoverQuantity = (decimal)order.OrderAmount / (decimal)order.FillPrice;
+
+            while (openCoverQuantity != 0)
+            {
+                //--- add new positionEntry
+                if (order.OrderAmount > 0 && openEntryQuantity >= 0
+                  || order.OrderAmount < 0 && openEntryQuantity <= 0)
+                {
+                    string underlyingSymbol = order.OrderTicket.Name;
+                    if (order.OrderTicket.Name.StartsWith("fake_option:"))
+                        underlyingSymbol = order.OrderTicket.Name.Substring(12).Split(new[] { "||" }, StringSplitOptions.None)[0];
+
+                    _openEntries[order.OrderTicket.Name].Add(new TTExtEntryPosition
+                    {
+                        Symbol = order.OrderTicket.Name,
+                        UnderlyingSymbol = underlyingSymbol,
+                        OpenQuantity = (decimal)order.OrderAmount / (decimal)order.FillPrice,
+                        EntryOrder = order,
+                        LogIndex = _loopCounter,
+                        SubmitDateOpen = order.OrderTicket.SubmitDate,
+                        CommentOpen = order.OrderTicket.Comment,
+                        BarsHeld = order.OrderTicket.OrderType == OrderType.closeThisBar ? 1 : 0,
+                        // Statistics = CalculateStatistics(order.OrderTicket.Name)
+                    });
+
+                    openCoverQuantity = 0;
+                }
+
+                //--- (partially) close positionEntry/ create new position
+                if (order.OrderAmount < 0 && openEntryQuantity > 0
+                || order.OrderAmount > 0 && openEntryQuantity < 0)
+                {
+                    if (!_openEntries.ContainsKey(order.OrderTicket.Name)
+                    || _openEntries[order.OrderTicket.Name].Count() == 0)
+                    {
+                        throw new Exception(
+                            string.Format("LogAnalysis.GroupOrders: no matching positionEntry found for Symbol {0}",
+                                order.OrderTicket.Name));
+                    }
+
+                    TTExtEntryPosition entryOrder = lastInFirstOut
+                        ? _openEntries[order.OrderTicket.Name].Last()   // LIFO
+                        : _openEntries[order.OrderTicket.Name].First(); // FIFO
+
+
+                    // set start and end date to calculate number of bars held
+                    _calendar.StartDate = entryOrder.EntryOrder.ExecDate;
+                    _calendar.EndDate = order.ExecDate;
+
+
+                    // create a new position
+                    decimal positionQuantity = openCoverQuantity < 0
+                        ? -Math.Min(Math.Abs(openCoverQuantity), entryOrder.OpenQuantity) // close long
+                        : Math.Min(openCoverQuantity, Math.Abs(entryOrder.OpenQuantity)); // close short
+
+                    _positionCounter += 1;
+
+                    decimal _netProfit = -positionQuantity * ((decimal)order.FillPrice - (decimal)entryOrder.EntryOrder.FillPrice) - (decimal)order.FrictionAmount - (decimal)entryOrder.EntryOrder.FrictionAmount;
+
+                    var pos = new TTExtPosition
+                    {
+                        Symbol = order.OrderTicket.Name,
+                        UnderlyingSymbol = entryOrder.UnderlyingSymbol,
+                        LogIndex = entryOrder.LogIndex,
+                        Quantity = -positionQuantity,
+                        NetProfit = _netProfit,
+                        NetProfitPerc = _netProfit / Math.Abs((decimal)entryOrder.EntryOrder.OrderAmount) * 100,
+                        BarsHeld = order.OrderTicket.OrderType == OrderType.closeThisBar ? entryOrder.BarsHeld - 1 : entryOrder.BarsHeld,
+                        Commissions = (decimal)order.FrictionAmount + (decimal)entryOrder.EntryOrder.FrictionAmount,
+                        SubmitDateOpen = entryOrder.SubmitDateOpen,
+                        ExecutionDateOpen = entryOrder.EntryOrder.ExecDate,
+                        SubmitDateClose = order.OrderTicket.SubmitDate,
+                        ExecutionDateClose = order.ExecDate,
+                        PositionIndex = _positionCounter,
+                        CommentOpen = entryOrder.CommentOpen,
+                        CommentClose = order.OrderTicket.Comment,
+                        Statistics = entryOrder.Statistics
+                    };
+
+                    _closedPositions.Add(pos);
+
+                    openCoverQuantity -= positionQuantity;
+                    if ((float)Math.Abs(openCoverQuantity) < 0.00001)
+                        openCoverQuantity = 0;
+
+                    openEntryQuantity += positionQuantity;
+                    if ((float)Math.Abs(openEntryQuantity) < 0.00001)
+                        openEntryQuantity = 0;
+
+                    // adjust or remove positionEntry
+                    entryOrder.OpenQuantity += positionQuantity;
+                    if ((float)Math.Abs(entryOrder.OpenQuantity) < 0.00001)
+                        entryOrder.OpenQuantity = 0;
+                    if (entryOrder.OpenQuantity == 0)
+                        _openEntries[order.OrderTicket.Name].Remove(entryOrder);
+                }
+            }
+        }
+
+        public TTExtStatistic CalculateStatistics(string symbol)
+        {
+            TTExtStatistic statistics = new();
+
+            var AllSymbolsPositions = _closedPositions
+                                          .OrderByDescending(a => a.PositionIndex)
+                                          .Take(256)
+                                          .ToList();
+
+            if (AllSymbolsPositions.Count >= 256)
+                statistics.AllSymbolsLast256PositionsNetchange = AllSymbolsPositions.Take(256).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 128)
+                statistics.AllSymbolsLast128PositionsNetchange = AllSymbolsPositions.Take(128).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 64)
+                statistics.AllSymbolsLast64PositionsNetchange = AllSymbolsPositions.Take(64).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 32)
+                statistics.AllSymbolsLast32PositionsNetchange = AllSymbolsPositions.Take(32).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 16)
+                statistics.AllSymbolsLast16PositionsNetchange = AllSymbolsPositions.Take(16).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 8)
+                statistics.AllSymbolsLast8PositionsNetchange = AllSymbolsPositions.Take(8).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 4)
+                statistics.AllSymbolsLast4PositionsNetchange = AllSymbolsPositions.Take(4).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 2)
+                statistics.AllSymbolsLast2PositionsNetchange = AllSymbolsPositions.Take(2).Sum(a => a.NetProfitPerc);
+
+            if (AllSymbolsPositions.Count >= 1)
+                statistics.AllSymbolsLastPositionNetchange = AllSymbolsPositions.Take(1).Sum(a => a.NetProfitPerc);
+
+            var SymbolPositions = _closedPositions
+                                      .Where(a => a.Symbol == symbol)
+                                      .OrderByDescending(a => a.PositionIndex)
+                                      .Take(256)
+                                      .ToList();
+
+            if (SymbolPositions.Count >= 256)
+                statistics.SymbolLast256PositionsNetchange = SymbolPositions.Take(256).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 128)
+                statistics.SymbolLast128PositionsNetchange = SymbolPositions.Take(128).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 64)
+                statistics.SymbolLast64PositionsNetchange = SymbolPositions.Take(64).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 32)
+                statistics.SymbolLast32PositionsNetchange = SymbolPositions.Take(32).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 16)
+                statistics.SymbolLast16PositionsNetchange = SymbolPositions.Take(16).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 8)
+                statistics.SymbolLast8PositionsNetchange = SymbolPositions.Take(8).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 4)
+                statistics.SymbolLast4PositionsNetchange = SymbolPositions.Take(4).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 2)
+                statistics.SymbolLast2PositionsNetchange = SymbolPositions.Take(2).Sum(a => a.NetProfitPerc);
+
+            if (SymbolPositions.Count >= 1)
+                statistics.SymbolLastPositionNetchange = SymbolPositions.Take(1).Sum(a => a.NetProfitPerc);
+
+            return statistics;
+        }
+#endif
     }
+
+#if EXTENSION 
+
+    #region public class TTExtEntryPosition
+    /// <summary>
+    /// Container to hold order positionEntry information
+    /// </summary>
+    public class TTExtEntryPosition
+    {
+        /// <summary>
+        /// Symbol
+        /// </summary>
+        public string Symbol { get; set; }
+        /// <summary>
+        /// underlying Symbol
+        /// </summary>
+        public string UnderlyingSymbol { get; set; }
+        /// <summary>
+        /// position quantity
+        /// </summary>
+        public decimal OpenQuantity { get; set; }
+        /// <summary>
+        /// order log positionEntry for position positionEntry
+        /// </summary>
+        public IAccount.OrderReceipt EntryOrder { get; set; }
+        /// <summary>
+        /// index in order log
+        /// </summary>
+        public int LogIndex { get; set; }
+        /// <summary>
+        /// Date/Time when position was opened
+        /// </summary>        
+        public DateTime SubmitDateOpen { get; set; }
+        /// <summary>
+        /// Open profit percentage
+        /// </summary>        
+        public double OpenProfitPerc { get; set; }
+        /// <summary>
+        /// Number of bars the position was held
+        /// </summary>        
+        public int BarsHeld { get; set; }
+        /// <summary>
+        /// Comment for position entry
+        /// </summary>        
+        public string CommentOpen { get; set; }
+        /// <summary>
+        /// Statistics when position was opened
+        /// </summary>        
+        public TTExtStatistic Statistics { get; set; }
+    }
+    #endregion
+
+    #region public class TTExtPosition
+    public class TTExtPosition
+    {
+        public string Symbol { get; set; }
+        public string UnderlyingSymbol { get; set; }
+        public int LogIndex { get; set; }
+        public decimal Quantity { get; set; }
+        public decimal NetProfit { get; set; }
+        public decimal NetProfitPerc { get; set; }
+        public int BarsHeld { get; set; }
+        public decimal Commissions { get; set; }
+        public DateTime SubmitDateOpen { get; set; }
+        public DateTime ExecutionDateOpen { get; set; }
+        public DateTime SubmitDateClose { get; set; }
+        public DateTime ExecutionDateClose { get; set; }
+        public int PositionIndex { get; set; }
+        public string CommentOpen { get; set; }
+        public string CommentClose { get; set; }
+        public TTExtStatistic Statistics { get; set; }
+    }
+    #endregion
+
+    #region public class TTExtStatistic
+    public class TTExtStatistic
+    {
+        public decimal AllSymbolsLastPositionNetchange { get; set; }
+        public decimal AllSymbolsLast2PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast4PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast8PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast16PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast32PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast64PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast128PositionsNetchange { get; set; }
+        public decimal AllSymbolsLast256PositionsNetchange { get; set; }
+        public decimal SymbolLastPositionNetchange { get; set; }
+        public decimal SymbolLast2PositionsNetchange { get; set; }
+        public decimal SymbolLast4PositionsNetchange { get; set; }
+        public decimal SymbolLast8PositionsNetchange { get; set; }
+        public decimal SymbolLast16PositionsNetchange { get; set; }
+        public decimal SymbolLast32PositionsNetchange { get; set; }
+        public decimal SymbolLast64PositionsNetchange { get; set; }
+        public decimal SymbolLast128PositionsNetchange { get; set; }
+        public decimal SymbolLast256PositionsNetchange { get; set; }
+    }
+    #endregion
+#endif
 }
 
 //==============================================================================

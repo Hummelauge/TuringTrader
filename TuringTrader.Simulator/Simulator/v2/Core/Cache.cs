@@ -39,6 +39,14 @@ namespace TuringTrader.SimulatorV2
         /// <param name="missFun">method to retrieve data on cache miss</param>
         /// <returns>cached data</returns>
         public T Fetch<T>(string cacheId, Func<T> missFun);
+
+#if EXTENSION
+        /// <summary>
+        /// Retrieve all cache content
+        /// </summary>
+        /// <returns>keys of cached data</returns>
+        public Dictionary<string, object> GetCache();
+#endif
     }
 
     /// <summary>
@@ -75,6 +83,13 @@ namespace TuringTrader.SimulatorV2
         {
             _cache.Clear();
         }
+
+#if EXTENSION
+        /// <summary>
+        /// Get cache contents
+        /// </summary>
+        public Dictionary<string, object> GetCache() { return _cache; }
+#endif
     }
 
     /// <summary>
@@ -92,6 +107,13 @@ namespace TuringTrader.SimulatorV2
         /// <param name="missFun"></param>
         /// <returns></returns>
         public T Fetch<T>(string cacheId, Func<T> missFun) => missFun();
+
+#if EXTENSION
+        /// <summary>
+        /// Get cache contents
+        /// </summary>
+        public Dictionary<string, object> GetCache() { return new Dictionary<string, object>(); }
+#endif
     }
 }
 

@@ -2,7 +2,7 @@
 // Name:        Backfills
 // Description: Backfills for common ETFs and indices.
 //              - file created automatically -
-// History:     2023/03/28, FUB, created
+// History:     2023/08/07, FUB, created
 // Copyright:   (c) 2011-2023, Bertram Enterprises LLC dba TuringTrader.
 //              https://www.turingtrader.org
 
@@ -38,11 +38,16 @@ namespace TuringTrader.SimulatorV2.Assets
         /// (since Jan 1970, backfilled to Jan 1970
         /// </summary>
         public const string DJI = "splice:$DJI,csv:backfills/$DJI.csv";
-        /// <summary>
+        /// <summary> 
         /// Dow Jones Industrial Average Total Return
         /// (since Sep 1987, backfilled to Jan 1970
         /// </summary>
         public const string DJITR = "splice:$DJITR,csv:backfills/$DJITR.csv";
+        /// <summary>
+        /// S&amp;P US Aggregate Bond Total Return Index
+        /// (since Apr 2002, backfilled to Jan 1970
+        /// </summary>
+        public const string SPUSAGGT = "splice:$SPUSAGGT,csv:backfills/$SPUSAGGT.csv";
     }
     /// <summary>
     /// Collection of common ETFs.
@@ -86,7 +91,7 @@ namespace TuringTrader.SimulatorV2.Assets
         public const string SLY = "splice:SLY,csv:backfills/SLY.csv";
         /// <summary>
         /// Vanguard S&amp;P Small-Cap 600 Index ETF
-        /// (since Sep 2010, backfilled to Dec 1994
+        /// (since Sep 2010, backfilled to Dec 1978
         /// </summary>
         public const string VIOO = "splice:VIOO,csv:backfills/VIOO.csv";
         /// <summary>
@@ -191,7 +196,7 @@ namespace TuringTrader.SimulatorV2.Assets
         public const string IWM = "splice:IWM,csv:backfills/IWM.csv";
         /// <summary>
         /// Vanguard Russell 1000 Index ETF
-        /// (since Sep 2010, backfilled to Jan 1990
+        /// (since Sep 2010, backfilled to Dec 1978
         /// </summary>
         public const string VONE = "splice:VONE,csv:backfills/VONE.csv";
         /// <summary>
@@ -226,7 +231,7 @@ namespace TuringTrader.SimulatorV2.Assets
         public const string EWJ = "splice:EWJ,csv:backfills/EWJ.csv";
         /// <summary>
         /// Vanguard Emerging Markets Stock Index ETF
-        /// (since Mar 2005, backfilled to Mar 2005
+        /// (since Mar 2005, backfilled to Jan 1990
         /// </summary>
         public const string VWO = "splice:VWO,csv:backfills/VWO.csv";
         /// <summary>
@@ -361,17 +366,17 @@ namespace TuringTrader.SimulatorV2.Assets
         public const string IAU = "splice:IAU,csv:backfills/IAU.csv";
         /// <summary>
         /// Invesco DB Commodity Index Tracking ETF
-        /// (since Feb 2006, backfilled to Jan 1991
+        /// (since Feb 2006, backfilled to Jan 1970
         /// </summary>
         public const string DBC = "splice:DBC,csv:backfills/DBC.csv";
         /// <summary>
         /// Invesco Optimum Yield Diversified Commodity Strategy No K-1 ETF
-        /// (since Nov 2014, backfilled to Jan 1991
+        /// (since Nov 2014, backfilled to Jan 1970
         /// </summary>
         public const string PDBC = "splice:PDBC,csv:backfills/PDBC.csv";
         /// <summary>
         /// Vanguard Real Estate Index ETF
-        /// (since Sep 2004, backfilled to Oct 2001
+        /// (since Sep 2004, backfilled to Dec 1977
         /// </summary>
         public const string VNQ = "splice:VNQ,csv:backfills/VNQ.csv";
         /// <summary>
@@ -479,5 +484,30 @@ namespace TuringTrader.SimulatorV2.Assets
         /// (since Jan 2018, backfilled to Jan 2008
         /// </summary>
         public const string VXX = "splice:VXX,csv:backfills/VXX.csv";
+        /// <summary>
+        /// VIXY - ProShares VIX Short-Term Futures ETF
+        /// (since Jan 2011, backfilled to Jan 2008)
+        /// </summary>
+        public const string VIXY = "splice:VIXY,csv:backfills/VIXY.csv";
+        /// <summary>
+        /// Grayscale Bitcoin ETF
+        /// (since May 2015, backfilled to Apr 2013
+        /// </summary>
+        public const string GBTC = "splice:GBTC,csv:backfills/GBTC.csv";
+        /// <summary>
+        /// iShares Bitcoin Trust ETF
+        /// (since Jan 2024, backfilled to Apr 2013
+        /// </summary>
+        public const string IBIT = "splice:IBIT,csv:backfills/IBIT.csv";
+        /// <summary>
+        /// Fidelity Wise Origin Bitcoin ETF
+        /// (since Jan 2024, backfilled to Apr 2013
+        /// </summary>
+        public const string FBTC = "splice:FBTC,csv:backfills/FBTC.csv";
+        /// <summary>
+        /// ProShares Bitcoin Strategy ETF
+        /// (since Oct 2021, backfilled to Apr 2013
+        /// </summary>
+        public const string BITO = "splice:BITO,csv:backfills/BITO.csv";
     }
 }
