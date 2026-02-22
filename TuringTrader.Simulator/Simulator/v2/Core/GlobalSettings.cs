@@ -355,6 +355,21 @@ namespace TuringTrader.SimulatorV2
         public static void SetRegistryValue(this Algorithm algo, string valueName, object value)
             => SetRegistryValue(algo.Name, valueName, value);
         #endregion
+
+#if EXTENSION
+        #region UniversePath
+        /// <summary>
+        /// Property to store the path to universes (list of assets, including index validity periods).
+        /// </summary>
+        static public string UniversesPath
+        {
+            get
+            {
+                return Path.Combine(HomePath, "Universes");
+            }
+        }
+        #endregion
+#endif
     }
 }
 

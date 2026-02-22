@@ -54,7 +54,7 @@ namespace TuringTrader.SimulatorV2
             Date = date;
             Value = value;
         }
-    } 
+    }
     #endregion
     #region class TimeSeries<T>
     /// <summary>
@@ -430,12 +430,6 @@ namespace TuringTrader.SimulatorV2
             /// Symbol's ticker symbol. 
             /// </summary>
             public string Ticker;
-#if EXTENSION
-            /// <summary>
-            /// Symbol's underlying ticker symbol. 
-            /// </summary>
-            public string UnderlyingTicker;
-#endif
             /// <summary>
             /// Symbol's full descriptive name.
             /// </summary>
@@ -444,6 +438,20 @@ namespace TuringTrader.SimulatorV2
             /// Algorithm instance that generated asset's data.
             /// </summary>
             public Algorithm Generator;
+#if EXTENSION
+            /// <summary>
+            /// Symbol's underlying ticker symbol. 
+            /// </summary>
+            public string UnderlyingTicker;
+            /// <summary>
+            /// First date/time of asset's data.
+            /// </summary>
+            public DateTime FirstDateTime;
+            /// <summary>
+            /// Last date/time of asset's data.
+            /// </summary>
+            public DateTime LastDateTime;
+#endif
         }
 
         /// <summary>
@@ -461,12 +469,6 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public string Ticker => Meta.Ticker;
 
-#if EXTENSION
-        /// <summary>
-        /// Convenience function to return asset's underlying ticker symbol. (for options)
-        /// </summary>
-        public string UnderlyingTicker => Meta.UnderlyingTicker;
-#endif
         /// <summary>
         /// Return time series of opening prices.
         /// </summary>

@@ -22,9 +22,10 @@
 //==============================================================================
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using TuringTrader.Simulator;
+using static TuringTrader.Simulator.LogAnalysis;
 
 namespace TuringTrader.SimulatorV2
 {
@@ -53,7 +54,8 @@ namespace TuringTrader.SimulatorV2
         private ITradingCalendar _calendar = new TradingCalendar_US();
 
         private Dictionary<string, List<TTExtEntryPosition>> _openEntries = new();
-        private List<TTExtPosition> _closedPositions = new();
+        private List<TTExtClosedPosition> _closedPositions = new();
+        private ConcurrentDictionary<string, Statistics> _statistics = new ConcurrentDictionary<string, Statistics>(new[] { new KeyValuePair<string, Statistics>("ALL_ASSETS", new Statistics()) });
         private int _positionCounter = 0;
         private int _loopCounter = 0;
 #endif
@@ -407,7 +409,12 @@ namespace TuringTrader.SimulatorV2
         /// <summary>
         /// Closed Positions
         /// </summary> 
-        public List<TTExtPosition> ClosedPositions { get => _closedPositions; }
+        public List<TTExtClosedPosition> ClosedPositions { get => _closedPositions; }
+
+        /// <summary>
+        /// Statistics for all closed positions
+        /// </summary> 
+        public ConcurrentDictionary<string, Statistics> Statistics { get => _statistics; }
 
         /// <summary>
         /// Initial Capital
@@ -458,13 +465,13 @@ namespace TuringTrader.SimulatorV2
                         SubmitDateOpen = order.OrderTicket.SubmitDate,
                         CommentOpen = order.OrderTicket.Comment,
                         BarsHeld = order.OrderTicket.OrderType == OrderType.closeThisBar ? 1 : 0,
-                        // Statistics = CalculateStatistics(order.OrderTicket.Name)
+                        Statistics = _statistics["ALL_ASSETS"].AddAllAssetStatistics(_statistics.GetOrAdd(order.OrderTicket.Name, _ => new Statistics()).GetAssetStatistics()),
                     });
 
                     openCoverQuantity = 0;
                 }
 
-                //--- (partially) close positionEntry/ create new position
+                //--- (at least partially) close positionEntry/ create new position
                 if (order.OrderAmount < 0 && openEntryQuantity > 0
                 || order.OrderAmount > 0 && openEntryQuantity < 0)
                 {
@@ -495,7 +502,7 @@ namespace TuringTrader.SimulatorV2
 
                     decimal _netProfit = -positionQuantity * ((decimal)order.FillPrice - (decimal)entryOrder.EntryOrder.FillPrice) - (decimal)order.FrictionAmount - (decimal)entryOrder.EntryOrder.FrictionAmount;
 
-                    var pos = new TTExtPosition
+                    var pos = new TTExtClosedPosition
                     {
                         Symbol = order.OrderTicket.Name,
                         UnderlyingSymbol = entryOrder.UnderlyingSymbol,
@@ -512,10 +519,13 @@ namespace TuringTrader.SimulatorV2
                         PositionIndex = _positionCounter,
                         CommentOpen = entryOrder.CommentOpen,
                         CommentClose = order.OrderTicket.Comment,
-                        Statistics = entryOrder.Statistics
+                        Statistics = entryOrder.Statistics,
                     };
 
                     _closedPositions.Add(pos);
+
+                    _statistics["ALL_ASSETS"].AddPosition(pos.NetProfitPerc);
+                    _statistics[order.OrderTicket.Name].AddPosition(pos.NetProfitPerc);
 
                     openCoverQuantity -= positionQuantity;
                     if ((float)Math.Abs(openCoverQuantity) < 0.00001)
@@ -533,78 +543,6 @@ namespace TuringTrader.SimulatorV2
                         _openEntries[order.OrderTicket.Name].Remove(entryOrder);
                 }
             }
-        }
-
-        public TTExtStatistic CalculateStatistics(string symbol)
-        {
-            TTExtStatistic statistics = new();
-
-            var AllSymbolsPositions = _closedPositions
-                                          .OrderByDescending(a => a.PositionIndex)
-                                          .Take(256)
-                                          .ToList();
-
-            if (AllSymbolsPositions.Count >= 256)
-                statistics.AllSymbolsLast256PositionsNetchange = AllSymbolsPositions.Take(256).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 128)
-                statistics.AllSymbolsLast128PositionsNetchange = AllSymbolsPositions.Take(128).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 64)
-                statistics.AllSymbolsLast64PositionsNetchange = AllSymbolsPositions.Take(64).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 32)
-                statistics.AllSymbolsLast32PositionsNetchange = AllSymbolsPositions.Take(32).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 16)
-                statistics.AllSymbolsLast16PositionsNetchange = AllSymbolsPositions.Take(16).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 8)
-                statistics.AllSymbolsLast8PositionsNetchange = AllSymbolsPositions.Take(8).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 4)
-                statistics.AllSymbolsLast4PositionsNetchange = AllSymbolsPositions.Take(4).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 2)
-                statistics.AllSymbolsLast2PositionsNetchange = AllSymbolsPositions.Take(2).Sum(a => a.NetProfitPerc);
-
-            if (AllSymbolsPositions.Count >= 1)
-                statistics.AllSymbolsLastPositionNetchange = AllSymbolsPositions.Take(1).Sum(a => a.NetProfitPerc);
-
-            var SymbolPositions = _closedPositions
-                                      .Where(a => a.Symbol == symbol)
-                                      .OrderByDescending(a => a.PositionIndex)
-                                      .Take(256)
-                                      .ToList();
-
-            if (SymbolPositions.Count >= 256)
-                statistics.SymbolLast256PositionsNetchange = SymbolPositions.Take(256).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 128)
-                statistics.SymbolLast128PositionsNetchange = SymbolPositions.Take(128).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 64)
-                statistics.SymbolLast64PositionsNetchange = SymbolPositions.Take(64).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 32)
-                statistics.SymbolLast32PositionsNetchange = SymbolPositions.Take(32).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 16)
-                statistics.SymbolLast16PositionsNetchange = SymbolPositions.Take(16).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 8)
-                statistics.SymbolLast8PositionsNetchange = SymbolPositions.Take(8).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 4)
-                statistics.SymbolLast4PositionsNetchange = SymbolPositions.Take(4).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 2)
-                statistics.SymbolLast2PositionsNetchange = SymbolPositions.Take(2).Sum(a => a.NetProfitPerc);
-
-            if (SymbolPositions.Count >= 1)
-                statistics.SymbolLastPositionNetchange = SymbolPositions.Take(1).Sum(a => a.NetProfitPerc);
-
-            return statistics;
         }
 #endif
     }
@@ -630,7 +568,7 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public decimal OpenQuantity { get; set; }
         /// <summary>
-        /// order log positionEntry for position positionEntry
+        /// order log positionEntry 
         /// </summary>
         public IAccount.OrderReceipt EntryOrder { get; set; }
         /// <summary>
@@ -638,7 +576,7 @@ namespace TuringTrader.SimulatorV2
         /// </summary>
         public int LogIndex { get; set; }
         /// <summary>
-        /// Date/Time when position was opened
+        /// Date/Time when order was submitted
         /// </summary>        
         public DateTime SubmitDateOpen { get; set; }
         /// <summary>
@@ -660,8 +598,8 @@ namespace TuringTrader.SimulatorV2
     }
     #endregion
 
-    #region public class TTExtPosition
-    public class TTExtPosition
+    #region public class TTExtClosedPosition
+    public class TTExtClosedPosition
     {
         public string Symbol { get; set; }
         public string UnderlyingSymbol { get; set; }
@@ -705,6 +643,123 @@ namespace TuringTrader.SimulatorV2
         public decimal SymbolLast256PositionsNetchange { get; set; }
     }
     #endregion
+
+    public class ProfitSlidingWindow
+    {
+        private readonly int _maxSize;
+        private readonly Queue<decimal> _q = new();
+        private decimal _sum;
+        public decimal Sum => _q.Count == _maxSize ? _sum : 0;
+
+        public ProfitSlidingWindow(int maxSize) => _maxSize = maxSize;
+
+        public void Add(decimal value)
+        {
+            _q.Enqueue(value);
+            _sum += value;
+            if (_q.Count > _maxSize)
+                _sum -= _q.Dequeue();
+        }
+    }
+
+    /// <summary>
+    /// Provides statistics for asset positions, including sliding window net changes.
+    /// </summary>
+    public class Statistics
+    {
+        /// <summary>
+        /// Sliding window for last position net change.
+        /// </summary>
+        public ProfitSlidingWindow LastPositionNetchange = new ProfitSlidingWindow(1);
+        /// <summary>
+        /// Sliding window for last 2 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last2PositionsNetchange = new ProfitSlidingWindow(2);
+        /// <summary>
+        /// Sliding window for last 4 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last4PositionsNetchange = new ProfitSlidingWindow(4);
+        /// <summary>
+        /// Sliding window for last 8 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last8PositionsNetchange = new ProfitSlidingWindow(8);
+        /// <summary>
+        /// Sliding window for last 16 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last16PositionsNetchange = new ProfitSlidingWindow(16);
+        /// <summary>
+        /// Sliding window for last 32 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last32PositionsNetchange = new ProfitSlidingWindow(32);
+        /// <summary>
+        /// Sliding window for last 64 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last64PositionsNetchange = new ProfitSlidingWindow(64);
+        /// <summary>
+        /// Sliding window for last 128 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last128PositionsNetchange = new ProfitSlidingWindow(128);
+        /// <summary>
+        /// Sliding window for last 256 positions net change.
+        /// </summary>
+        public ProfitSlidingWindow Last256PositionsNetchange = new ProfitSlidingWindow(256);
+
+        /// <summary>
+        /// Adds a position's net change percentage to all sliding windows.
+        /// </summary>
+        /// <param name="netChange">Net change percentage to add.</param>
+        public void AddPosition(decimal netChange)
+        {
+            LastPositionNetchange.Add(netChange);
+            Last2PositionsNetchange.Add(netChange);
+            Last4PositionsNetchange.Add(netChange);
+            Last8PositionsNetchange.Add(netChange);
+            Last16PositionsNetchange.Add(netChange);
+            Last32PositionsNetchange.Add(netChange);
+            Last64PositionsNetchange.Add(netChange);
+            Last128PositionsNetchange.Add(netChange);
+            Last256PositionsNetchange.Add(netChange);
+        }
+
+        /// <summary>
+        /// Gets asset statistics for the current sliding windows.
+        /// </summary>
+        /// <returns>Asset statistics.</returns>
+        public TTExtStatistic GetAssetStatistics()
+        {
+            return new TTExtStatistic
+            {
+                SymbolLastPositionNetchange = LastPositionNetchange.Sum,
+                SymbolLast2PositionsNetchange = Last2PositionsNetchange.Sum,
+                SymbolLast4PositionsNetchange = Last4PositionsNetchange.Sum,
+                SymbolLast8PositionsNetchange = Last8PositionsNetchange.Sum,
+                SymbolLast16PositionsNetchange = Last16PositionsNetchange.Sum,
+                SymbolLast32PositionsNetchange = Last32PositionsNetchange.Sum,
+                SymbolLast64PositionsNetchange = Last64PositionsNetchange.Sum,
+                SymbolLast128PositionsNetchange = Last128PositionsNetchange.Sum,
+                SymbolLast256PositionsNetchange = Last256PositionsNetchange.Sum
+            };
+        }
+
+        /// <summary>
+        /// Adds all asset statistics to the provided asset statistics object.
+        /// </summary>
+        /// <param name="assetStatistics">Asset statistics to update.</param>
+        /// <returns>Updated asset statistics.</returns>
+        public TTExtStatistic AddAllAssetStatistics(TTExtStatistic assetStatistics)
+        {
+            assetStatistics.AllSymbolsLastPositionNetchange = LastPositionNetchange.Sum;
+            assetStatistics.AllSymbolsLast2PositionsNetchange = Last2PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast4PositionsNetchange = Last4PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast8PositionsNetchange = Last8PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast16PositionsNetchange = Last16PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast32PositionsNetchange = Last32PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast64PositionsNetchange = Last64PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast128PositionsNetchange = Last128PositionsNetchange.Sum;
+            assetStatistics.AllSymbolsLast256PositionsNetchange = Last256PositionsNetchange.Sum;
+            return assetStatistics;
+        }
+    }
 #endif
 }
 

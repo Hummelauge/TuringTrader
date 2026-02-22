@@ -117,7 +117,6 @@ namespace TuringTrader.BooksAndPubsV2
         public override void Run()
         {
 
-
             //========== initialization ==========
 
             StartDate = StartDate ?? AlgorithmConstants.START_DATE;

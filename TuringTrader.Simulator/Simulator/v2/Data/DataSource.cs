@@ -329,15 +329,34 @@ namespace TuringTrader.SimulatorV2
                 info[DataSourceParam.nickName2] = nickname.Substring(idx + 1);
                 info[DataSourceParam.dataFeed] = nickname.Substring(0, idx);
 #if EXTENSION
-                var fakeOptionData = info[DataSourceParam.nickName2].Split("||");
-                if (fakeOptionData.Length == 4)
+                switch (info[DataSourceParam.dataFeed])
                 {
-                    info[DataSourceParam.nickName2] = fakeOptionData[0];
-                    info[DataSourceParam.optionUnderlying] = fakeOptionData[0];
-                    info[DataSourceParam.optionRight] = fakeOptionData[1];
-                    info[DataSourceParam.optionStrike] = fakeOptionData[2];
-                    info[DataSourceParam.optionExpiration] = fakeOptionData[3];
-                    info[DataSourceParam.dataFeed] = "fake_option";
+                    case "fake_option":
+                        var fakeOptionData = info[DataSourceParam.nickName2].Split("||");
+                        if (fakeOptionData.Length == 4)
+                        {
+                            info[DataSourceParam.nickName2] = fakeOptionData[0];
+                            info[DataSourceParam.optionUnderlying] = fakeOptionData[0];
+                            info[DataSourceParam.optionRight] = fakeOptionData[1];
+                            info[DataSourceParam.optionStrike] = fakeOptionData[2];
+                            info[DataSourceParam.optionExpiration] = fakeOptionData[3];
+                        }
+                        break;
+                    case "norgate_history":
+                        info[DataSourceParam.ticker] = info[DataSourceParam.nickName2];
+                        info[DataSourceParam.dataPath] = "Cache\\" + info[DataSourceParam.nickName2] + "\\" + info[DataSourceParam.nickName2] + ".csv";
+                        info[DataSourceParam.date] = "{1:yyyyMMdd}";
+                        info[DataSourceParam.time] = "16:00";
+                        info[DataSourceParam.open] = "{2:F2}";
+                        info[DataSourceParam.high] = "{3:F2}";
+                        info[DataSourceParam.low] = "{4:F2}";
+                        info[DataSourceParam.close] = "{5:F2}";
+                        info[DataSourceParam.volume] = "{6:F2}";
+                        info[DataSourceParam.delim] = "\\t";
+                        break;
+                    default:
+                        // colon: extract data source
+                        break;
                 }
 #endif            
             }
@@ -447,6 +466,7 @@ namespace TuringTrader.SimulatorV2
 #endif
 #if EXTENSION
                 Tuple.Create("fake_option", (Action)null, FakeOptionGetAsset),
+                Tuple.Create("norgate_history", (Action)null, CsvGetAsset),
 #endif
                 };
 
@@ -459,7 +479,14 @@ namespace TuringTrader.SimulatorV2
                 if (dataSource.Contains(i.Item1))
                 {
                     if (i.Item2 != null) i.Item2();
+#if EXTENSION
+                    var assetData = i.Item3(owner, info);
+                    assetData.Item2.FirstDateTime = assetData.Item1 == null || assetData.Item1.Count == 0 ? DateTime.MinValue : assetData.Item1.FirstOrDefault().Date;
+                    assetData.Item2.LastDateTime  = assetData.Item1 == null || assetData.Item1.Count == 0 ? DateTime.MinValue : assetData.Item1.LastOrDefault().Date;
+                    return assetData;
+#else
                     return i.Item3(owner, info);
+#endif
                 }
 
             throw new Exception(string.Format("DataSource: unknown data feed '{0}'", dataSource));
@@ -523,6 +550,7 @@ namespace TuringTrader.SimulatorV2
         public static object _lockGetMeta = new object();
         public static object _lockGetData = new object();
 
+#if EXTENSION
         /// <summary>
         /// Helper function to load, parse, and extract data through a disk cache. 
         /// This helper is used for the web-based data sources, namely FRED, Yahoo, and Tiingo.
@@ -567,23 +595,146 @@ namespace TuringTrader.SimulatorV2
                             DateTime cacheStartTime = new DateTime(ts.ReadInt64());
                             DateTime cacheEndTime = new DateTime(ts.ReadInt64());
 
-#if EXTENSION
                             DateTime cacheLastUpdateTime = DateTime.MinValue;
                             try
                             { cacheLastUpdateTime = new DateTime(ts.ReadInt64()); }
                             catch (System.IO.EndOfStreamException ex)
                             { } // if we can't read the last update time, we assume that there never was an update OR the timestamp file was created by the original version of the simulator
 
-                            if (cacheEndTime >= endDate
-                                || (cacheLastUpdateTime - cacheEndTime).TotalDays > 90)
-#else
-                            if (cacheStartTime <= startDate && cacheEndTime >= endDate)
-#endif
+                            if (cacheEndTime >= algo.EndDate                          // if the cache contains data that exceeds the algorithm's end date/time
+                            || (cacheLastUpdateTime - cacheEndTime).TotalDays > 20    // or if there were no updates for more than 20 days => hopeless cases
+                            || cacheLastUpdateTime > algo.EndDate)                    // of if the cache was updated after the algorithm's end date/time
                             {
                                 using (BinaryReader pc = new BinaryReader(File.Open(dataCache, FileMode.Open)))
                                     rawData = pc.ReadString();
                                 parsedData = parseData(rawData);
+                                if (parsedData == null && rawData == "[]")
+                                    return new List<BarType<OHLCV>>();
                             }
+                        }
+                    }
+                    
+                    //--- 2) if failed, try to retrieve from web
+                    if (parsedData == null)
+                    {
+                        // try loading data no more than twice
+                        var tmpData = (string)null;
+                        for (int i = 0; i < 2; i++)
+                        {
+                            try
+                            {
+                                tmpData = getData();
+                                break;
+                            }
+                            catch (Exception /*ex*/)
+                            {
+                                // ignore
+                            }
+                        }
+
+                        parsedData = parseData(tmpData);
+
+                        if (parsedData != null || tmpData == "[]")
+                        {
+                            rawData = tmpData;
+                            writeToDisk = true;
+                        }
+                        else
+                        {
+                            // we might have discarded the data from disk before,
+                            // because the time frame wasn't what we were looking for. 
+                            // however, in case we can't load from web, e.g. because 
+                            // we don't have internet connectivity, it's still better 
+                            // to go with what we have in the cache
+                            parsedData = parseData(rawData);
+                        }
+                    }
+
+                    //--- 3) if failed, throw and return
+                    if (parsedData == null && rawData != "[]")
+                    {
+                        //throw new Exception(string.Format("Failed to load data for {0}", info[DataSourceParam.nickName]));
+                        //Output.WriteInfo("DataSource Tiingo: Failed to load data for {0}", info[DataSourceParam.nickName]);
+                        return null;
+                    }
+
+                    //--- 4) extract data for TuringTrader
+                    var convertedData = extractData(parsedData);
+
+                    //--- 5) if newly retrieved, write to disk
+                    if (writeToDisk)
+                    {
+                        Directory.CreateDirectory(cachePath);
+                        using (BinaryWriter pc = new BinaryWriter(File.Open(dataCache, FileMode.Create)))
+                            pc.Write(rawData);
+
+                        using (BinaryWriter ts = new BinaryWriter(File.Open(timeStamps, FileMode.Create)))
+                        {
+                            // we write the dates we received. 
+                            ts.Write(convertedData == null || convertedData.Count == 0 ? DateTime.MinValue.Ticks : convertedData.First().Date.Ticks);
+                            ts.Write(convertedData == null || convertedData.Count == 0 ? DateTime.MinValue.Ticks : convertedData.Last().Date.Ticks);
+                            ts.Write(DateTime.Now.Ticks); // last update time
+                        }
+                    }
+
+                    return convertedData;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(string.Format("Failed to load data for {0}: {1}", info[DataSourceParam.nickName], ex.Message));
+            }
+        }
+#else
+        /// <summary>
+        /// Helper function to load, parse, and extract data through a disk cache. 
+        /// This helper is used for the web-based data sources, namely FRED, Yahoo, and Tiingo.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="algo"></param>
+        /// <param name="info"></param>
+        /// <param name="getData"></param>
+        /// <param name="parseData"></param>
+        /// <param name="extractData"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        private static List<BarType<OHLCV>> _loadDataHelper<T>(
+            Algorithm algo,
+            Dictionary<DataSourceParam, string> info,
+            Func<string> getData,
+            Func<string, T> parseData,
+            Func<T, List<BarType<OHLCV>>> extractData
+        ) where T : class
+        {
+            try
+            {
+                lock (_lockGetData)
+                {
+                    var tradingDays = algo.TradingCalendar.TradingDays;
+                    var startDate = tradingDays.First();
+                    var endDate = tradingDays.Last();
+
+                    string cachePath = Path.Combine(Simulator.GlobalSettings.HomePath, "Cache", info[DataSourceParam.nickName2]);
+                    string timeStamps = Path.Combine(cachePath, info[DataSourceParam.dataFeed] + "_timestamps");
+                    string dataCache = Path.Combine(cachePath, info[DataSourceParam.dataFeed] + "_data");
+
+                    bool writeToDisk = false;
+                    string rawData = null;
+                    T parsedData = null;
+
+                    //--- 1) try to read raw json from disk
+                    if (File.Exists(timeStamps) && File.Exists(dataCache))
+                    {
+                        using (BinaryReader pc = new BinaryReader(File.Open(dataCache, FileMode.Open)))
+                            rawData = pc.ReadString();
+
+                        using (BinaryReader ts = new BinaryReader(File.Open(timeStamps, FileMode.Open)))
+                        {
+                            DateTime cacheStartTime = new DateTime(ts.ReadInt64());
+                            DateTime cacheEndTime = new DateTime(ts.ReadInt64());
+
+                            if (cacheStartTime <= startDate && cacheEndTime >= endDate)
+                                parsedData = parseData(rawData);
                         }
                     }
 
@@ -623,32 +774,7 @@ namespace TuringTrader.SimulatorV2
                         }
                     }
 
-#if EXTENSION
-                    //--- 3) if failed, throw
-                    if (parsedData == null)
-                        throw new Exception(string.Format("Failed to load data for {0}", info[DataSourceParam.nickName]));
 
-                    //--- 4) extract data for TuringTrader
-                    var convertedData = extractData(parsedData);
-
-                    //--- 5) if newly retrieved, write to disk
-                    if (writeToDisk)
-                    {
-                        Directory.CreateDirectory(cachePath);
-                        using (BinaryWriter pc = new BinaryWriter(File.Open(dataCache, FileMode.Create)))
-                            pc.Write(rawData);
-
-                        using (BinaryWriter ts = new BinaryWriter(File.Open(timeStamps, FileMode.Create)))
-                        {
-                            // we write the dates we received. 
-                            ts.Write(convertedData.First().Date.Ticks);
-                            ts.Write(convertedData.Last().Date.Ticks);
-                            ts.Write(DateTime.Now.Ticks); // last update time
-                        }
-                    }
-
-                    return convertedData;
-#else
                     //--- 3) if failed, return
                     if (parsedData == null)
                         return null;
@@ -673,7 +799,6 @@ namespace TuringTrader.SimulatorV2
 
                     //--- 5) extract data for TuringTrader
                     return extractData(parsedData);
-#endif
                 }
             }
             catch (Exception ex)
@@ -681,6 +806,7 @@ namespace TuringTrader.SimulatorV2
                 throw new Exception(string.Format("Failed to load data for {0}: {1}", info[DataSourceParam.nickName], ex.Message));
             }
         }
+#endif
 
         /// <summary>
         /// Helper function to load, parse, and extract meta data through a disk cache.

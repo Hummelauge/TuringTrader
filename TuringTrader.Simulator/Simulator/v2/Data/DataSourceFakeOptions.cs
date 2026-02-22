@@ -1,27 +1,4 @@
-﻿//==============================================================================
-// Project:     TuringTrader, simulator core
-// Name:        DataSourceCsv
-// Description: Virtual data source to use data from algorithms.
-// History:     2022xi25, FUB, created
-//------------------------------------------------------------------------------
-// Copyright:   (c) 2011-2023, Bertram Enterprises LLC dba TuringTrader.
-//              https://www.turingtrader.org
-// License:     This file is part of TuringTrader, an open-source backtesting
-//              engine/ trading simulator.
-//              TuringTrader is free software: you can redistribute it and/or 
-//              modify it under the terms of the GNU Affero General Public 
-//              License as published by the Free Software Foundation, either 
-//              version 3 of the License, or (at your option) any later version.
-//              TuringTrader is distributed in the hope that it will be useful,
-//              but WITHOUT ANY WARRANTY; without even the implied warranty of
-//              MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
-//              GNU Affero General Public License for more details.
-//              You should have received a copy of the GNU Affero General Public
-//              License along with TuringTrader. If not, see 
-//              https://www.gnu.org/licenses/agpl-3.0.
-//==============================================================================
-
-#if EXTENSION
+﻿#if EXTENSION
 
 using System;
 using System.Collections.Generic;
@@ -41,7 +18,8 @@ namespace TuringTrader.SimulatorV2
         {
             var bars = new List<BarType<OHLCV>>();
 
-            var underlyingAsset = DataSource.LoadAsset(algo, info[DataSourceParam.optionUnderlying]);
+            var underlyingAsset = algo.Asset(info[DataSourceParam.optionUnderlying]); // DataSource.LoadAsset(algo, info[DataSourceParam.optionUnderlying]);
+            var underlyingVolatility = underlyingAsset.Close.Volatility(10);
 
             bool isCall = info[DataSourceParam.optionRight] == "call" ? true : false;
 
@@ -56,17 +34,8 @@ namespace TuringTrader.SimulatorV2
             double low = 0d;
             double close = 0d;
 
-#if MORE_VIX_PERIODS
             var volatilities = new Dictionary<double, TimeSeriesAsset>
-                { { 9 / 365.25, DataSource.LoadAsset(algo, "$VIX9D") },
-                  { 30 / 365.25, DataSource.LoadAsset(algo, "$VIX") },
-                  { 91 / 365.25, DataSource.LoadAsset(algo, "$VIX3M") },
-                  { 182 / 365.25, DataSource.LoadAsset(algo, "$VIX6M") },
-                  { 365 / 365.25, DataSource.LoadAsset(algo, "$VIX1Y") }, };
-#else
-            var volatilities = new Dictionary<double, TimeSeriesAsset>
-                { { 30 / 365.25, DataSource.LoadAsset(algo, "$VIX") }, };
-#endif
+                { { 30 / 365.25, algo.Asset( "$VIX" ) }, };
 
             for (int idx = 0; idx < underlyingAsset.Data.Count; idx++)
             {
@@ -100,11 +69,13 @@ namespace TuringTrader.SimulatorV2
                             + p * (vHigh.Value.Close[idx] - vLow.Value.Close[idx]));
                     }
 
+                    //volatility = underlyingVolatility[idx] / 100.0;
+
                     double z = (strike - underlyingBar.Value.Open) / (Math.Sqrt(T) * underlyingBar.Value.Open * volatility);
                     double vol = volatility * (1.0 + 0.30 * Math.Abs(z));
                     open = OptionSupport.GBlackScholes(isCall, underlyingBar.Value.Open, strike, T, 0.0, // risk-free rate
-                                                                                                     0.0, // cost-of-carry rate
-                                                                                                     vol);
+                                                                                                    0.0, // cost-of-carry rate
+                                                                                                    vol);
 
                     z = (strike - underlyingBar.Value.High) / (Math.Sqrt(T) * underlyingBar.Value.High * volatility);
                     vol = volatility * (1.0 + 0.30 * Math.Abs(z));

@@ -508,7 +508,7 @@ namespace TuringTrader.SimulatorV2.Indicators
         /// <returns>exp time series</returns>
         public static TimeSeriesFloat Exp(this TimeSeriesFloat series)
         {
-            var name = string.Format("{0}.Sqrt", series.Name);
+            var name = string.Format("{0}.Exp", series.Name);
 
             return series.Owner.ObjectCache.Fetch(
                 name,

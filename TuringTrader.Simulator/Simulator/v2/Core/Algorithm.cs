@@ -439,7 +439,7 @@ namespace TuringTrader.SimulatorV2
 
         /// <summary>
         /// Load quotations or run algorithm, dependent on the type of 
-        /// the object passed in.
+        /// the object passed in. 
         /// </summary>
         /// <param name="obj">string or algorithm</param>
         /// <returns>asset time series</returns>
@@ -505,6 +505,13 @@ namespace TuringTrader.SimulatorV2
         #endregion
 
 #if EXTENSION
+        /// <summary>
+        /// Return constituents of universe from CSV file
+        /// </summary>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public virtual Dictionary<string, List<ValidityPeriods>> UniversesDynamic(string name) => DataSource.UniversesDynamic(name);
+
         public ServiceCollection serviceCollection = new ServiceCollection();
         public ServiceProvider serviceProvider;
 #endif
