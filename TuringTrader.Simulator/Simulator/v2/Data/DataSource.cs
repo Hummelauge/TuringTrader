@@ -41,7 +41,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Threading.Tasks;
 #endregion
 
@@ -209,6 +208,12 @@ namespace TuringTrader.SimulatorV2
             /// symbol for Tiingo
             /// </summary>
             symbolTiingo,
+#if EXTENSION
+            /// <summary>
+            /// symbol for Database
+            /// </summary>
+            symbolDatabase,
+#endif
             /// <summary>
             /// data feed to use
             /// </summary>
@@ -303,6 +308,9 @@ namespace TuringTrader.SimulatorV2
                     "yahoo" => DataSourceParam.symbolYahoo,
                     "tiingo" => DataSourceParam.symbolTiingo,
                     "fred" => DataSourceParam.symbolFred,
+#if EXTENSION
+                    "database" => DataSourceParam.symbolDatabase,
+#endif
                     _ => DataSourceParam.error,
                 };
 
@@ -355,7 +363,6 @@ namespace TuringTrader.SimulatorV2
                         info[DataSourceParam.delim] = "\\t";
                         break;
                     default:
-                        // colon: extract data source
                         break;
                 }
 #endif            
@@ -396,7 +403,9 @@ namespace TuringTrader.SimulatorV2
             info = _fillInIfMissing(info, DataSourceParam.symbolNorgate, info[DataSourceParam.ticker]);
             info = _fillInIfMissing(info, DataSourceParam.symbolFred, info[DataSourceParam.ticker]);
             info = _fillInIfMissing(info, DataSourceParam.symbolTiingo, info[DataSourceParam.ticker]);
-
+#if EXTENSION
+            info = _fillInIfMissing(info, DataSourceParam.symbolDatabase, info[DataSourceParam.ticker]);
+#endif
             // imply datafeed=csv, if parsing info is found
             if (info.ContainsKey(DataSourceParam.date)
                 || info.ContainsKey(DataSourceParam.open)
@@ -465,6 +474,7 @@ namespace TuringTrader.SimulatorV2
                 Tuple.Create("algo", (Action)null, AlgoGetAsset),
 #endif
 #if EXTENSION
+                Tuple.Create("database", (Action)null, DatabaseGetAsset),
                 Tuple.Create("fake_option", (Action)null, FakeOptionGetAsset),
                 Tuple.Create("norgate_history", (Action)null, CsvGetAsset),
 #endif
@@ -482,7 +492,7 @@ namespace TuringTrader.SimulatorV2
 #if EXTENSION
                     var assetData = i.Item3(owner, info);
                     assetData.Item2.FirstDateTime = assetData.Item1 == null || assetData.Item1.Count == 0 ? DateTime.MinValue : assetData.Item1.FirstOrDefault().Date;
-                    assetData.Item2.LastDateTime  = assetData.Item1 == null || assetData.Item1.Count == 0 ? DateTime.MinValue : assetData.Item1.LastOrDefault().Date;
+                    assetData.Item2.LastDateTime = assetData.Item1 == null || assetData.Item1.Count == 0 ? DateTime.MinValue : assetData.Item1.LastOrDefault().Date;
                     return assetData;
 #else
                     return i.Item3(owner, info);
@@ -598,7 +608,7 @@ namespace TuringTrader.SimulatorV2
                             DateTime cacheLastUpdateTime = DateTime.MinValue;
                             try
                             { cacheLastUpdateTime = new DateTime(ts.ReadInt64()); }
-                            catch (System.IO.EndOfStreamException ex)
+                            catch (EndOfStreamException ex)
                             { } // if we can't read the last update time, we assume that there never was an update OR the timestamp file was created by the original version of the simulator
 
                             if (cacheEndTime >= algo.EndDate                          // if the cache contains data that exceeds the algorithm's end date/time
@@ -610,26 +620,24 @@ namespace TuringTrader.SimulatorV2
                                 parsedData = parseData(rawData);
                                 if (parsedData == null && rawData == "[]")
                                     return new List<BarType<OHLCV>>();
+                                else
+                                    Output.WriteInfo("Loaded data points for {0} from cache", info[DataSourceParam.nickName]);
                             }
                         }
                     }
-                    
+
                     //--- 2) if failed, try to retrieve from web
                     if (parsedData == null)
                     {
-                        // try loading data no more than twice
+                        // try loading data
                         var tmpData = (string)null;
-                        for (int i = 0; i < 2; i++)
+                        try
                         {
-                            try
-                            {
-                                tmpData = getData();
-                                break;
-                            }
-                            catch (Exception /*ex*/)
-                            {
-                                // ignore
-                            }
+                            tmpData = getData();
+                        }
+                        catch (Exception /*ex*/)
+                        {
+                            // ignore
                         }
 
                         parsedData = parseData(tmpData);
@@ -653,9 +661,8 @@ namespace TuringTrader.SimulatorV2
                     //--- 3) if failed, throw and return
                     if (parsedData == null && rawData != "[]")
                     {
-                        //throw new Exception(string.Format("Failed to load data for {0}", info[DataSourceParam.nickName]));
-                        //Output.WriteInfo("DataSource Tiingo: Failed to load data for {0}", info[DataSourceParam.nickName]);
-                        return null;
+                        Output.WriteWarning("Failed to load data for {0}", info[DataSourceParam.nickName]);
+                        return new List<BarType<OHLCV>>();
                     }
 
                     //--- 4) extract data for TuringTrader
@@ -677,6 +684,7 @@ namespace TuringTrader.SimulatorV2
                         }
                     }
 
+                    Output.WriteInfo("Loaded {0} data points for {1} from {2}", convertedData.Count, info[DataSourceParam.nickName], info[DataSourceParam.dataFeed]);
                     return convertedData;
                 }
             }
@@ -774,7 +782,6 @@ namespace TuringTrader.SimulatorV2
                         }
                     }
 
-
                     //--- 3) if failed, return
                     if (parsedData == null)
                         return null;
@@ -860,7 +867,15 @@ namespace TuringTrader.SimulatorV2
 
                     //--- 3) if failed, return
                     if (parsedMeta == null)
+#if EXTENSION
+                        return new TimeSeriesAsset.MetaType
+                        {
+                            Ticker = info[DataSourceParam.nickName2],
+                            Description = info[DataSourceParam.nickName2],
+                        };
+#else
                         return null;
+#endif
 
                     //--- 4) if newly retrieved, write to disk
                     if (writeToDisk)

@@ -175,6 +175,12 @@ namespace TuringTrader.Simulator
         /// symbol for Tiingo
         /// </summary>
         symbolTiingo,
+#if EXTENSION
+        /// <summary>
+        /// symbol for Database
+        /// </summary>
+        symbolDatabase,
+#endif
         /// <summary>
         /// data feed to use
         /// </summary>

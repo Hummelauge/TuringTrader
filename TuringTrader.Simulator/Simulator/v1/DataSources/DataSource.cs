@@ -331,6 +331,9 @@ namespace TuringTrader.Simulator
                     { DataSourceParam.symbolInteractiveBrokers, "{0}"},
                     { DataSourceParam.symbolSplice, "{0}"},
                     { DataSourceParam.symbolAlgo, "{0}"},
+#if EXTENSION
+                    { DataSourceParam.symbolDatabase, "{0}"},
+#endif
                 };
 
                 string infoPathName = Path.Combine(DataPath, "_defaults_.inf");
@@ -386,6 +389,9 @@ namespace TuringTrader.Simulator
                 DataSourceParam.symbolTiingo,
                 DataSourceParam.symbolSplice,
                 DataSourceParam.symbolAlgo,
+#if EXTENSION
+                DataSourceParam.symbolDatabase,
+#endif  
             };
 
             foreach (var field in updateWithTicker)
@@ -525,6 +531,9 @@ namespace TuringTrader.Simulator
             defaultIfUndefined(DataSourceParam.symbolInteractiveBrokers);
             defaultIfUndefined(DataSourceParam.symbolSplice);
             defaultIfUndefined(DataSourceParam.symbolAlgo);
+#if EXTENSION
+            defaultIfUndefined(DataSourceParam.symbolDatabase);
+#endif
 
             //===== instantiate data source
             string dataSource = infos[DataSourceParam.dataFeed].ToLower();
@@ -596,6 +605,13 @@ namespace TuringTrader.Simulator
             if (dataSource.Contains("stooq"))
             {
                 return new DataSourceStooq(infos);
+            }
+            else
+#endif
+#if EXTENSION
+            if (dataSource.Contains("database"))
+            {
+                return new DataSourceYahoo(infos);
             }
             else
 #endif

@@ -31,6 +31,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
+using TuringTrader.SimulatorV2;
 #endregion
 
 namespace TuringTrader.Simulator
@@ -160,8 +162,14 @@ namespace TuringTrader.Simulator
 
                     string tmpPrices = null;
 #pragma warning disable SYSLIB0014 // Type or member is obsolete
+#if EXTENSION
+                    //tmpPrices = ResilientHttpClientFactory.Yahoo.GetAsJsonAsync(url, convertSymbol(Info[DataSourceParam.symbolYahoo]), "Yahoo data points").Result;
+                    tmpPrices = Task.Run(() => ResilientHttpClientFactory.Yahoo.GetAsJsonAsync( url, convertSymbol(Info[DataSourceParam.symbolYahoo]), "Yahoo data points"
+                                                )).GetAwaiter().GetResult();
+#else
                     using (var client = new WebClient())
                         tmpPrices = client.DownloadString(url);
+#endif
 #pragma warning restore SYSLIB0014 // Type or member is obsolete
 
                     jsonPrices = parsePrices(tmpPrices);
@@ -291,6 +299,9 @@ namespace TuringTrader.Simulator
 
                     try
                     {
+#if EXTENSION
+                        Info[DataSourceParam.name] = info[DataSourceParam.ticker];
+#else
                         string tmp1 = meta.Substring(meta.IndexOf("<h1"));
                         string tmp2 = tmp1.Substring(0, tmp1.IndexOf("h1>"));
 
@@ -300,6 +311,7 @@ namespace TuringTrader.Simulator
                         tmp4 = tmp4.Replace("&amp;", "&");
 
                         Info[DataSourceParam.name] = tmp4;
+#endif
                     }
                     catch
                     {
@@ -309,7 +321,7 @@ namespace TuringTrader.Simulator
                     }
                 }
             }
-            #endregion
+#endregion
             #region public override IEnumerable<Bar> LoadData(DateTime startTime, DateTime endTime)
             /// <summary>
             /// Load data into memory.
@@ -445,7 +457,8 @@ namespace TuringTrader.Simulator
                         Output.WriteLine(string.Format(" finished after {0:F1} seconds", (t2 - t1).TotalSeconds));
 
                         return bars;
-                    };
+                    }
+                    ;
 
                     data = Cache<List<Bar>>.GetData(cacheKey, retrievalFunction, true);
                 }

@@ -369,6 +369,44 @@ namespace TuringTrader.SimulatorV2
             }
         }
         #endregion
+
+        #region DBUser
+        /// <summary>
+        ///  Database user
+        /// </summary>
+        static public string DBUser
+        {
+            get
+            {
+                object value = GetRegistryValue("SimulatorEngine", "DBUser");
+                if (value == null) return "";
+                return value.ToString();
+            }
+            set
+            {
+                SetRegistryValue("SimulatorEngine", "DBUser", value);
+            }
+        }
+        #endregion
+
+        #region DBPassword
+        /// <summary>
+        ///  Database password
+        /// </summary>
+        static public string DBPassword
+        {
+            get
+            {
+                object value = GetRegistryValue("SimulatorEngine", "DBPassword");
+                if (value == null) return "";
+                return value.ToString();
+            }
+            set
+            {
+                SetRegistryValue("SimulatorEngine", "DBPassword", value);
+            }
+        }
+        #endregion
 #endif
     }
 }

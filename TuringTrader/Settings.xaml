@@ -31,6 +31,8 @@
                         <ComboBoxItem>Tiingo</ComboBoxItem>
                         <ComboBoxItem>Norgate</ComboBoxItem>
                         <ComboBoxItem>FRED</ComboBoxItem>
+                        <ComboBoxItem>Stooq</ComboBoxItem>
+                        <ComboBoxItem>Database</ComboBoxItem>
                     </ComboBox>
                     <Label Content="Tiingo API Key:" HorizontalAlignment ="Left" VerticalAlignment="top" Margin="10,41,0,0" RenderTransformOrigin="0.455,-0.285"/>
                     <TextBox Name="TextTiingoApiKey" Height="23" Margin="180,45,10,0" TextWrapping="Wrap" Text="{Binding TiingoApiKey}" VerticalAlignment="Top"/>

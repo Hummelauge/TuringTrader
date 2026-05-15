@@ -21,14 +21,201 @@
 //              https://www.gnu.org/licenses/agpl-3.0.
 //==============================================================================
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace TuringTrader.SimulatorV2
 {
+#if EXTENSION
+    public static partial class DataSource
+    {
+        #region Yahoo internal helpers
+        private static YahooService Yahoo => ResilientHttpClientFactory.Yahoo;
+        private static string _yahooConvertTicker(string ticker) => ticker.Replace('.', '-');
+        private static DateTime _yahooEpochOrigin = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        private static long _yahooToUnixTime(DateTime timestamp) => Convert.ToInt64((timestamp - _yahooEpochOrigin).TotalSeconds);
+        #endregion
+
+        // cache for symbol meta information to avoid repeated lookups
+        // the endpoint for retrieving the meta information is the same as for retrieving the data points
+        private static Dictionary<string, string> _symbolMeta = new();
+
+        private static List<BarType<OHLCV>> YahooLoadData(Algorithm algo, Dictionary<DataSourceParam, string> info)
+        {
+            return _loadDataHelper<JObject>(   // Note: Yahoo usually returns a single JSON object with "chart" property
+                algo, info,
+                () =>
+                {
+                    var url = string.Format(CultureInfo.InvariantCulture,
+                                                $"/v8/finance/chart/{_yahooConvertTicker(info[DataSourceParam.symbolYahoo])}"
+                                              + $"?period1=0"
+                                              + $"&period2={_yahooToUnixTime(DateTime.Now + TimeSpan.FromDays(5))}"
+                                              + $"&interval=1d"
+                                              + $"&events=history"
+                                              + $"&includePrePost=false"         // only regular trading hours, no pre/post market data
+                                              + $"&includeAdjustedClose=true");  // include adjusted close for proper price adjustments
+
+                    return Yahoo.GetAsJsonAsync(url, _yahooConvertTicker(info[DataSourceParam.symbolYahoo]), "Yahoo data points").Result;
+                },
+                (raw) =>
+                {
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(raw) || raw.Length < 50)
+                            return null;
+
+                        var json = JObject.Parse(raw);
+
+                        // cache meta information for later use in the meta loading step, to avoid repeated http lookups
+                        JToken? metaToken = json.SelectToken("chart.result[0].meta");
+                        if (metaToken != null && metaToken.Type == JTokenType.Object)
+                        {
+                            try
+                            {
+                                var metaObject = (JObject)metaToken;
+                                string onlyMetaJson = metaObject.ToString(Formatting.Indented);
+                                _symbolMeta[info[DataSourceParam.symbolYahoo]] = onlyMetaJson;
+                            }
+                            catch
+                            {
+                                // Meta caching failed - non-critical, continue without meta cache
+                            }
+                        }
+
+                        return json["chart"] != null ? json : null;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                },
+                (jsonData) =>
+                {
+                    var bars = new List<BarType<OHLCV>>();
+                    var exchangeTimeZone = TimeZoneInfo.FindSystemTimeZoneById(info[DataSourceParam.timezone]);
+                    var timeOfDay = DateTime.Parse(info[DataSourceParam.time]).TimeOfDay;
+                    var result = jsonData["chart"]?["result"]?[0];
+
+                    if (result == null)
+                        return bars;
+
+                    var timestamps = result["timestamp"] as JArray;
+                    var quotes = result["indicators"]?["quote"]?[0];
+
+                    if (timestamps == null || quotes == null)
+                        return bars;
+
+                    for (int i = 0; i < timestamps.Count; i++)
+                    {
+                        var barDate = DateTimeOffset.FromUnixTimeSeconds((long)timestamps[i]).DateTime;
+                        var exchangeClose = TimeZoneInfo.ConvertTime(barDate.ToLocalTime(), exchangeTimeZone).Date + timeOfDay;
+                        var localDate = TimeZoneInfo.ConvertTimeToUtc(exchangeClose, exchangeTimeZone).ToLocalTime();
+
+                        try
+                        {
+                            double open = (double)quotes["open"]?[i];
+                            double high = (double)quotes["high"]?[i];
+                            double low = (double)quotes["low"]?[i];
+                            double close = (double)quotes["close"]?[i];
+                            long volume = (long)quotes["volume"]?[i];
+
+                            bars.Add(new BarType<OHLCV>(
+                                localDate,
+                                new OHLCV(open, high, low, close, volume)));
+                        }
+                        catch
+                        {
+                            // Yahoo taints the results by filling in null values
+                            // we try to handle this gracefully here
+                            if (bars.Count < 1)
+                                continue;
+
+                            var prevBar = bars.Last();
+
+                            bars.Add(new BarType<OHLCV>(
+                                localDate,
+                                new OHLCV(
+                                    prevBar.Value.Open,
+                                    prevBar.Value.High,
+                                    prevBar.Value.Low,
+                                    prevBar.Value.Close,
+                                    prevBar.Value.Volume)));
+                        }
+                    }
+
+                    return bars;
+                });
+        }
+
+        private static TimeSeriesAsset.MetaType YahooLoadMeta(Algorithm algo, Dictionary<DataSourceParam, string> info) =>
+            _loadMetaHelper<JObject>(
+                algo, info,
+                () =>
+                {   // retrieve meta from Yahoo
+                    /*   does not seem to be working reliably, and the name is usually included in the data points response anyway, so we skip this for now
+                    var url = string.Format(CultureInfo.InvariantCulture, $"http://finance.yahoo.com/quote/{_yahooConvertTicker(info[DataSourceParam.symbolYahoo])}");
+
+                    return Yahoo.GetAsJsonAsync(url, _yahooConvertTicker(info[DataSourceParam.symbolYahoo]), "Yahoo meta data")
+                                .Result;
+                    */
+
+                    // this is from the data points retrieval step, where we cache the meta information to avoid repeated lookups
+                    try
+                    {
+                        var metaJson = _symbolMeta[info[DataSourceParam.symbolYahoo]];
+                        _symbolMeta.Remove(info[DataSourceParam.symbolYahoo]);  // remove from cache after retrieving meta to avoid memory bloat
+                        return metaJson;
+                    }
+                    catch (KeyNotFoundException)
+                    {
+                        return null; // meta not found in cache, likely due to a failure in the data retrieval step, return null to indicate meta loading failure
+                    }
+                },
+                (raw) =>
+                {   // parse data and check validity
+                    try
+                    {
+                        if (string.IsNullOrWhiteSpace(raw) || raw.Length < 50)
+                            return null;
+
+                        var json = JObject.Parse(raw);
+                        return json != null ? json : null;
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                },
+                (jsonData) =>
+                {   // extract meta for TuringTrader
+                    var shortName = (string)jsonData?["shortName"] ?? info[DataSourceParam.symbolYahoo];
+
+                    return new TimeSeriesAsset.MetaType
+                    {
+                        Ticker = info[DataSourceParam.symbolYahoo],
+                        Description = shortName,
+                    };
+                });
+
+
+        private static Tuple<List<BarType<OHLCV>>, TimeSeriesAsset.MetaType> YahooGetAsset(
+            Algorithm owner,
+            Dictionary<DataSourceParam, string> info)
+        {
+            return Tuple.Create(
+                YahooLoadData(owner, info),
+                YahooLoadMeta(owner, info));
+        }
+    }
+
+#else
     public static partial class DataSource
     {
         #region internal helpers
@@ -211,6 +398,7 @@ namespace TuringTrader.SimulatorV2
                 YahooLoadMeta(owner, info));
         }
     }
+#endif
 }
 
 //==============================================================================

@@ -27,13 +27,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AvalonLibrary" Version="3.0.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
-    <PackageReference Include="Microsoft.Windows.Compatibility" Version="9.0.5" />
-    <PackageReference Include="NetOfficeFw.Core" Version="1.9.7">
+    <PackageReference Include="AvalonLibrary" Version="4.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.7" />
+    <PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.7" />
+    <PackageReference Include="NetOfficeFw.Core" Version="1.9.9">
       <NoWarn>NU1701</NoWarn>
     </PackageReference>
-    <PackageReference Include="NetOfficeFw.Excel" Version="1.9.7">
+    <PackageReference Include="NetOfficeFw.Excel" Version="1.9.9">
       <NoWarn>NU1701</NoWarn>
     </PackageReference>
     <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
